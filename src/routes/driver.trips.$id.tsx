@@ -15,10 +15,8 @@ import { formatKm, formatMinutes, formatVND } from "@/lib/format";
 
 export const Route = createFileRoute("/driver/trips/$id")({
   head: () => ({ meta: [{ title: "Chuyến đi hiện tại" }] }),
-  component: DriverTripDetail;
+  component: DriverTripDetail,
 });
-
-// TypeScript: fix stray semicolon workaround — actual component below.
 
 function DriverTripDetail() {
   const { id } = Route.useParams();
