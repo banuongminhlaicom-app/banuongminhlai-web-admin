@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Car, ChevronRight, CreditCard, Headphones, LogOut, MapPin, Shield, Star, User, Wallet } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({
@@ -47,6 +48,7 @@ function Profile() {
 
       <div className="mt-4 px-5">
         <div className="overflow-hidden rounded-3xl bg-surface">
+          <ThemeToggle variant="row" className="border-b border-border/60" />
           {ITEMS.map(({ label, Icon, to }) => (
             <Link key={label} to={to} className="flex items-center gap-3 border-b border-border/60 p-4 last:border-b-0 active:bg-background/30">
               <div className="grid h-9 w-9 place-items-center rounded-xl bg-background text-primary"><Icon className="h-4 w-4" /></div>
