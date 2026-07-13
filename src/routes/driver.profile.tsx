@@ -58,6 +58,10 @@ function DriverProfile() {
         </div>
       </div>
 
+      <div className="mx-5 mt-4 overflow-hidden rounded-2xl bg-surface">
+        <ThemeToggle variant="row" />
+      </div>
+
       <div className="mx-5 mt-4 divide-y divide-border/60 overflow-hidden rounded-2xl bg-surface">
         {DOCS.map((d) => (
           <div key={d.label} className="flex items-center justify-between p-4">
