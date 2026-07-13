@@ -16,6 +16,7 @@ import { Route as TripsRouteImport } from './routes/trips'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as ScheduleRouteImport } from './routes/schedule'
+import { Route as RewardsRouteImport } from './routes/rewards'
 import { Route as PromotionsRouteImport } from './routes/promotions'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -24,6 +25,7 @@ import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as DriverRouteImport } from './routes/driver'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as BookingRouteImport } from './routes/booking'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AddressesRouteImport } from './routes/addresses'
@@ -77,6 +79,11 @@ const ScheduleRoute = ScheduleRouteImport.update({
   path: '/schedule',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RewardsRoute = RewardsRouteImport.update({
+  id: '/rewards',
+  path: '/rewards',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PromotionsRoute = PromotionsRouteImport.update({
   id: '/promotions',
   path: '/promotions',
@@ -115,6 +122,11 @@ const HomeRoute = HomeRouteImport.update({
 const DriverRoute = DriverRouteImport.update({
   id: '/driver',
   path: '/driver',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BookingRoute = BookingRouteImport.update({
@@ -208,6 +220,7 @@ export interface FileRoutesByFullPath {
   '/addresses': typeof AddressesRoute
   '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
+  '/change-password': typeof ChangePasswordRoute
   '/driver': typeof DriverRouteWithChildren
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
@@ -216,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/promotions': typeof PromotionsRoute
+  '/rewards': typeof RewardsRoute
   '/schedule': typeof ScheduleRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -242,6 +256,7 @@ export interface FileRoutesByTo {
   '/addresses': typeof AddressesRoute
   '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
+  '/change-password': typeof ChangePasswordRoute
   '/driver': typeof DriverRouteWithChildren
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
@@ -250,6 +265,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/promotions': typeof PromotionsRoute
+  '/rewards': typeof RewardsRoute
   '/schedule': typeof ScheduleRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -277,6 +293,7 @@ export interface FileRoutesById {
   '/addresses': typeof AddressesRoute
   '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
+  '/change-password': typeof ChangePasswordRoute
   '/driver': typeof DriverRouteWithChildren
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
@@ -285,6 +302,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/promotions': typeof PromotionsRoute
+  '/rewards': typeof RewardsRoute
   '/schedule': typeof ScheduleRoute
   '/support': typeof SupportRoute
   '/terms': typeof TermsRoute
@@ -313,6 +331,7 @@ export interface FileRouteTypes {
     | '/addresses'
     | '/admin'
     | '/booking'
+    | '/change-password'
     | '/driver'
     | '/home'
     | '/login'
@@ -321,6 +340,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/promotions'
+    | '/rewards'
     | '/schedule'
     | '/support'
     | '/terms'
@@ -347,6 +367,7 @@ export interface FileRouteTypes {
     | '/addresses'
     | '/admin'
     | '/booking'
+    | '/change-password'
     | '/driver'
     | '/home'
     | '/login'
@@ -355,6 +376,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/promotions'
+    | '/rewards'
     | '/schedule'
     | '/support'
     | '/terms'
@@ -381,6 +403,7 @@ export interface FileRouteTypes {
     | '/addresses'
     | '/admin'
     | '/booking'
+    | '/change-password'
     | '/driver'
     | '/home'
     | '/login'
@@ -389,6 +412,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/promotions'
+    | '/rewards'
     | '/schedule'
     | '/support'
     | '/terms'
@@ -416,6 +440,7 @@ export interface RootRouteChildren {
   AddressesRoute: typeof AddressesRoute
   AdminRoute: typeof AdminRouteWithChildren
   BookingRoute: typeof BookingRouteWithChildren
+  ChangePasswordRoute: typeof ChangePasswordRoute
   DriverRoute: typeof DriverRouteWithChildren
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
@@ -424,6 +449,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   PromotionsRoute: typeof PromotionsRoute
+  RewardsRoute: typeof RewardsRoute
   ScheduleRoute: typeof ScheduleRoute
   SupportRoute: typeof SupportRoute
   TermsRoute: typeof TermsRoute
@@ -484,6 +510,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScheduleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rewards': {
+      id: '/rewards'
+      path: '/rewards'
+      fullPath: '/rewards'
+      preLoaderRoute: typeof RewardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/promotions': {
       id: '/promotions'
       path: '/promotions'
@@ -538,6 +571,13 @@ declare module '@tanstack/react-router' {
       path: '/driver'
       fullPath: '/driver'
       preLoaderRoute: typeof DriverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/booking': {
@@ -719,6 +759,7 @@ const rootRouteChildren: RootRouteChildren = {
   AddressesRoute: AddressesRoute,
   AdminRoute: AdminRouteWithChildren,
   BookingRoute: BookingRouteWithChildren,
+  ChangePasswordRoute: ChangePasswordRoute,
   DriverRoute: DriverRouteWithChildren,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
@@ -727,6 +768,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   PromotionsRoute: PromotionsRoute,
+  RewardsRoute: RewardsRoute,
   ScheduleRoute: ScheduleRoute,
   SupportRoute: SupportRoute,
   TermsRoute: TermsRoute,

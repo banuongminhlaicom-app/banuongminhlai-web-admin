@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Car, ChevronRight, CreditCard, Headphones, LogOut, MapPin, Shield, Star, User, Wallet } from "lucide-react";
+import { Award, Car, ChevronRight, CreditCard, Headphones, KeyRound, LogOut, MapPin, Shield, Star, User, Wallet } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
@@ -10,10 +10,12 @@ export const Route = createFileRoute("/profile")({
 });
 
 const ITEMS = [
+  { label: "Điểm thưởng", Icon: Award, to: "/rewards" },
   { label: "Ví & thanh toán", Icon: Wallet, to: "/wallet" },
   { label: "Phương tiện của tôi", Icon: Car, to: "/vehicles" },
   { label: "Địa chỉ đã lưu", Icon: MapPin, to: "/addresses" },
   { label: "Phương thức thanh toán", Icon: CreditCard, to: "/wallet" },
+  { label: "Đổi mật khẩu", Icon: KeyRound, to: "/change-password" },
   { label: "Trung tâm hỗ trợ", Icon: Headphones, to: "/support" },
   { label: "Điều khoản & bảo mật", Icon: Shield, to: "/terms" },
 ] as const;
@@ -40,7 +42,10 @@ function Profile() {
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
             <Stat label="Chuyến" value="14" />
-            <Stat label="Điểm" value="230" />
+            <Link to="/rewards" className="rounded-xl transition active:bg-background/50">
+              <div className="text-lg font-black text-primary">230</div>
+              <div className="text-[10px] uppercase text-muted-foreground">Điểm</div>
+            </Link>
             <Stat label="Ưu đãi" value="3" />
           </div>
         </div>
