@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, LogOut, Star } from "lucide-react";
 import { toast } from "sonner";
 import { DriverShell } from "@/components/DriverShell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { driverStore } from "@/lib/driver-store";
 
 export const Route = createFileRoute("/driver/profile")({
@@ -55,6 +56,10 @@ function DriverProfile() {
         <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">
           <CheckCircle2 className="h-3 w-3" /> Hồ sơ đã được phê duyệt
         </div>
+      </div>
+
+      <div className="mx-5 mt-4 overflow-hidden rounded-2xl bg-surface">
+        <ThemeToggle variant="row" />
       </div>
 
       <div className="mx-5 mt-4 divide-y divide-border/60 overflow-hidden rounded-2xl bg-surface">
