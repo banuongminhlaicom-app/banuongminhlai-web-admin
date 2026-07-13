@@ -42,7 +42,10 @@ function Profile() {
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-border pt-4 text-center">
             <Stat label="Chuyến" value="14" />
-            <Stat label="Điểm" value="230" />
+            <Link to="/rewards" className="rounded-xl transition active:bg-background/50">
+              <div className="text-lg font-black text-primary">230</div>
+              <div className="text-[10px] uppercase text-muted-foreground">Điểm</div>
+            </Link>
             <Stat label="Ưu đãi" value="3" />
           </div>
         </div>
