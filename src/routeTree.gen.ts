@@ -24,12 +24,12 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
-import { Route as DriverRouteImport } from './routes/driver'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as BookingRouteImport } from './routes/booking'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AddressesRouteImport } from './routes/addresses'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DriverIndexRouteImport } from './routes/driver.index'
 import { Route as DriverProfileRouteImport } from './routes/driver.profile'
 import { Route as DriverLoginRouteImport } from './routes/driver.login'
 import { Route as DriverEarningsRouteImport } from './routes/driver.earnings'
@@ -120,11 +120,6 @@ const HomeRoute = HomeRouteImport.update({
   path: '/home',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DriverRoute = DriverRouteImport.update({
-  id: '/driver',
-  path: '/driver',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ChangePasswordRoute = ChangePasswordRouteImport.update({
   id: '/change-password',
   path: '/change-password',
@@ -148,6 +143,11 @@ const AddressesRoute = AddressesRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriverIndexRoute = DriverIndexRouteImport.update({
+  id: '/driver/',
+  path: '/driver/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DriverProfileRoute = DriverProfileRouteImport.update({
@@ -227,7 +227,6 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
-  '/driver': typeof DriverRouteWithChildren
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
@@ -255,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/login': typeof DriverLoginRoute
   '/driver/profile': typeof DriverProfileRoute
+  '/driver/': typeof DriverIndexRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips/': typeof DriverTripsIndexRoute
 }
@@ -264,7 +264,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
-  '/driver': typeof DriverRouteWithChildren
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
@@ -292,6 +291,7 @@ export interface FileRoutesByTo {
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/login': typeof DriverLoginRoute
   '/driver/profile': typeof DriverProfileRoute
+  '/driver': typeof DriverIndexRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips': typeof DriverTripsIndexRoute
 }
@@ -302,7 +302,6 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
-  '/driver': typeof DriverRouteWithChildren
   '/home': typeof HomeRoute
   '/login': typeof LoginRoute
   '/notifications': typeof NotificationsRoute
@@ -330,6 +329,7 @@ export interface FileRoutesById {
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/login': typeof DriverLoginRoute
   '/driver/profile': typeof DriverProfileRoute
+  '/driver/': typeof DriverIndexRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips/': typeof DriverTripsIndexRoute
 }
@@ -341,7 +341,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/booking'
     | '/change-password'
-    | '/driver'
     | '/home'
     | '/login'
     | '/notifications'
@@ -369,6 +368,7 @@ export interface FileRouteTypes {
     | '/driver/earnings'
     | '/driver/login'
     | '/driver/profile'
+    | '/driver/'
     | '/driver/trips/$id'
     | '/driver/trips/'
   fileRoutesByTo: FileRoutesByTo
@@ -378,7 +378,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/booking'
     | '/change-password'
-    | '/driver'
     | '/home'
     | '/login'
     | '/notifications'
@@ -406,6 +405,7 @@ export interface FileRouteTypes {
     | '/driver/earnings'
     | '/driver/login'
     | '/driver/profile'
+    | '/driver'
     | '/driver/trips/$id'
     | '/driver/trips'
   id:
@@ -415,7 +415,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/booking'
     | '/change-password'
-    | '/driver'
     | '/home'
     | '/login'
     | '/notifications'
@@ -443,6 +442,7 @@ export interface FileRouteTypes {
     | '/driver/earnings'
     | '/driver/login'
     | '/driver/profile'
+    | '/driver/'
     | '/driver/trips/$id'
     | '/driver/trips/'
   fileRoutesById: FileRoutesById
@@ -453,7 +453,6 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   BookingRoute: typeof BookingRouteWithChildren
   ChangePasswordRoute: typeof ChangePasswordRoute
-  DriverRoute: typeof DriverRouteWithChildren
   HomeRoute: typeof HomeRoute
   LoginRoute: typeof LoginRoute
   NotificationsRoute: typeof NotificationsRoute
@@ -469,6 +468,7 @@ export interface RootRouteChildren {
   VehiclesRoute: typeof VehiclesRoute
   VerifyOtpRoute: typeof VerifyOtpRoute
   WalletRoute: typeof WalletRoute
+  DriverIndexRoute: typeof DriverIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -578,13 +578,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/driver': {
-      id: '/driver'
-      path: '/driver'
-      fullPath: '/driver'
-      preLoaderRoute: typeof DriverRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/change-password': {
       id: '/change-password'
       path: '/change-password'
@@ -618,6 +611,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/driver/': {
+      id: '/driver/'
+      path: '/driver'
+      fullPath: '/driver/'
+      preLoaderRoute: typeof DriverIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/driver/profile': {
@@ -756,32 +756,12 @@ const BookingRouteChildren: BookingRouteChildren = {
 const BookingRouteWithChildren =
   BookingRoute._addFileChildren(BookingRouteChildren)
 
-interface DriverRouteChildren {
-  DriverEarningsRoute: typeof DriverEarningsRoute
-  DriverLoginRoute: typeof DriverLoginRoute
-  DriverProfileRoute: typeof DriverProfileRoute
-  DriverTripsIdRoute: typeof DriverTripsIdRoute
-  DriverTripsIndexRoute: typeof DriverTripsIndexRoute
-}
-
-const DriverRouteChildren: DriverRouteChildren = {
-  DriverEarningsRoute: DriverEarningsRoute,
-  DriverLoginRoute: DriverLoginRoute,
-  DriverProfileRoute: DriverProfileRoute,
-  DriverTripsIdRoute: DriverTripsIdRoute,
-  DriverTripsIndexRoute: DriverTripsIndexRoute,
-}
-
-const DriverRouteWithChildren =
-  DriverRoute._addFileChildren(DriverRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AddressesRoute: AddressesRoute,
   AdminRoute: AdminRouteWithChildren,
   BookingRoute: BookingRouteWithChildren,
   ChangePasswordRoute: ChangePasswordRoute,
-  DriverRoute: DriverRouteWithChildren,
   HomeRoute: HomeRoute,
   LoginRoute: LoginRoute,
   NotificationsRoute: NotificationsRoute,
@@ -797,7 +777,18 @@ const rootRouteChildren: RootRouteChildren = {
   VehiclesRoute: VehiclesRoute,
   VerifyOtpRoute: VerifyOtpRoute,
   WalletRoute: WalletRoute,
+  DriverIndexRoute: DriverIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
