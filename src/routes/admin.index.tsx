@@ -5,7 +5,7 @@ import { MOCK_TRIPS, TRIP_STATUS_LABEL } from "@/lib/mock";
 import { formatVND } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Admin · Tổng quan" }] }),
   component: AdminDashboard,
 });
