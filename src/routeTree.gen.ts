@@ -26,10 +26,10 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as HomeRouteImport } from './routes/home'
 import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as BookingRouteImport } from './routes/booking'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AddressesRouteImport } from './routes/addresses'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DriverIndexRouteImport } from './routes/driver.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as DriverProfileRouteImport } from './routes/driver.profile'
 import { Route as DriverLoginRouteImport } from './routes/driver.login'
 import { Route as DriverEarningsRouteImport } from './routes/driver.earnings'
@@ -130,11 +130,6 @@ const BookingRoute = BookingRouteImport.update({
   path: '/booking',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AddressesRoute = AddressesRouteImport.update({
   id: '/addresses',
   path: '/addresses',
@@ -148,6 +143,11 @@ const IndexRoute = IndexRouteImport.update({
 const DriverIndexRoute = DriverIndexRouteImport.update({
   id: '/driver/',
   path: '/driver/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DriverProfileRoute = DriverProfileRouteImport.update({
@@ -176,39 +176,39 @@ const BookingIdRoute = BookingIdRouteImport.update({
   getParentRoute: () => BookingRoute,
 } as any)
 const AdminSupportRoute = AdminSupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/support',
+  path: '/admin/support',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminReportsRoute = AdminReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/reports',
+  path: '/admin/reports',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
-  id: '/promotions',
-  path: '/promotions',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/promotions',
+  path: '/admin/promotions',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminPricingRoute = AdminPricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/pricing',
+  path: '/admin/pricing',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDriversRoute = AdminDriversRouteImport.update({
-  id: '/drivers',
-  path: '/drivers',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/drivers',
+  path: '/admin/drivers',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminCustomersRoute = AdminCustomersRouteImport.update({
-  id: '/customers',
-  path: '/customers',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/customers',
+  path: '/admin/customers',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminBookingsRoute = AdminBookingsRouteImport.update({
-  id: '/bookings',
-  path: '/bookings',
-  getParentRoute: () => AdminRoute,
+  id: '/admin/bookings',
+  path: '/admin/bookings',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DriverTripsIndexRoute = DriverTripsIndexRouteImport.update({
   id: '/driver/trips/',
@@ -224,7 +224,6 @@ const DriverTripsIdRoute = DriverTripsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/addresses': typeof AddressesRoute
-  '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/home': typeof HomeRoute
@@ -254,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/login': typeof DriverLoginRoute
   '/driver/profile': typeof DriverProfileRoute
+  '/admin/': typeof AdminIndexRoute
   '/driver/': typeof DriverIndexRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips/': typeof DriverTripsIndexRoute
@@ -261,7 +261,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/addresses': typeof AddressesRoute
-  '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/home': typeof HomeRoute
@@ -291,6 +290,7 @@ export interface FileRoutesByTo {
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/login': typeof DriverLoginRoute
   '/driver/profile': typeof DriverProfileRoute
+  '/admin': typeof AdminIndexRoute
   '/driver': typeof DriverIndexRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips': typeof DriverTripsIndexRoute
@@ -299,7 +299,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/addresses': typeof AddressesRoute
-  '/admin': typeof AdminRouteWithChildren
   '/booking': typeof BookingRouteWithChildren
   '/change-password': typeof ChangePasswordRoute
   '/home': typeof HomeRoute
@@ -329,6 +328,7 @@ export interface FileRoutesById {
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/login': typeof DriverLoginRoute
   '/driver/profile': typeof DriverProfileRoute
+  '/admin/': typeof AdminIndexRoute
   '/driver/': typeof DriverIndexRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips/': typeof DriverTripsIndexRoute
@@ -338,7 +338,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/addresses'
-    | '/admin'
     | '/booking'
     | '/change-password'
     | '/home'
@@ -368,6 +367,7 @@ export interface FileRouteTypes {
     | '/driver/earnings'
     | '/driver/login'
     | '/driver/profile'
+    | '/admin/'
     | '/driver/'
     | '/driver/trips/$id'
     | '/driver/trips/'
@@ -375,7 +375,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/addresses'
-    | '/admin'
     | '/booking'
     | '/change-password'
     | '/home'
@@ -405,6 +404,7 @@ export interface FileRouteTypes {
     | '/driver/earnings'
     | '/driver/login'
     | '/driver/profile'
+    | '/admin'
     | '/driver'
     | '/driver/trips/$id'
     | '/driver/trips'
@@ -412,7 +412,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/addresses'
-    | '/admin'
     | '/booking'
     | '/change-password'
     | '/home'
@@ -442,6 +441,7 @@ export interface FileRouteTypes {
     | '/driver/earnings'
     | '/driver/login'
     | '/driver/profile'
+    | '/admin/'
     | '/driver/'
     | '/driver/trips/$id'
     | '/driver/trips/'
@@ -450,7 +450,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AddressesRoute: typeof AddressesRoute
-  AdminRoute: typeof AdminRouteWithChildren
   BookingRoute: typeof BookingRouteWithChildren
   ChangePasswordRoute: typeof ChangePasswordRoute
   HomeRoute: typeof HomeRoute
@@ -468,9 +467,17 @@ export interface RootRouteChildren {
   VehiclesRoute: typeof VehiclesRoute
   VerifyOtpRoute: typeof VerifyOtpRoute
   WalletRoute: typeof WalletRoute
+  AdminBookingsRoute: typeof AdminBookingsRoute
+  AdminCustomersRoute: typeof AdminCustomersRoute
+  AdminDriversRoute: typeof AdminDriversRoute
+  AdminPricingRoute: typeof AdminPricingRoute
+  AdminPromotionsRoute: typeof AdminPromotionsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminSupportRoute: typeof AdminSupportRoute
   DriverEarningsRoute: typeof DriverEarningsRoute
   DriverLoginRoute: typeof DriverLoginRoute
   DriverProfileRoute: typeof DriverProfileRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   DriverIndexRoute: typeof DriverIndexRoute
   DriverTripsIdRoute: typeof DriverTripsIdRoute
   DriverTripsIndexRoute: typeof DriverTripsIndexRoute
@@ -597,13 +604,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/addresses': {
       id: '/addresses'
       path: '/addresses'
@@ -623,6 +623,13 @@ declare module '@tanstack/react-router' {
       path: '/driver'
       fullPath: '/driver/'
       preLoaderRoute: typeof DriverIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/driver/profile': {
@@ -662,52 +669,52 @@ declare module '@tanstack/react-router' {
     }
     '/admin/support': {
       id: '/admin/support'
-      path: '/support'
+      path: '/admin/support'
       fullPath: '/admin/support'
       preLoaderRoute: typeof AdminSupportRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/reports': {
       id: '/admin/reports'
-      path: '/reports'
+      path: '/admin/reports'
       fullPath: '/admin/reports'
       preLoaderRoute: typeof AdminReportsRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/promotions': {
       id: '/admin/promotions'
-      path: '/promotions'
+      path: '/admin/promotions'
       fullPath: '/admin/promotions'
       preLoaderRoute: typeof AdminPromotionsRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/pricing': {
       id: '/admin/pricing'
-      path: '/pricing'
+      path: '/admin/pricing'
       fullPath: '/admin/pricing'
       preLoaderRoute: typeof AdminPricingRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/drivers': {
       id: '/admin/drivers'
-      path: '/drivers'
+      path: '/admin/drivers'
       fullPath: '/admin/drivers'
       preLoaderRoute: typeof AdminDriversRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/customers': {
       id: '/admin/customers'
-      path: '/customers'
+      path: '/admin/customers'
       fullPath: '/admin/customers'
       preLoaderRoute: typeof AdminCustomersRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/admin/bookings': {
       id: '/admin/bookings'
-      path: '/bookings'
+      path: '/admin/bookings'
       fullPath: '/admin/bookings'
       preLoaderRoute: typeof AdminBookingsRouteImport
-      parentRoute: typeof AdminRoute
+      parentRoute: typeof rootRouteImport
     }
     '/driver/trips/': {
       id: '/driver/trips/'
@@ -726,28 +733,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AdminRouteChildren {
-  AdminBookingsRoute: typeof AdminBookingsRoute
-  AdminCustomersRoute: typeof AdminCustomersRoute
-  AdminDriversRoute: typeof AdminDriversRoute
-  AdminPricingRoute: typeof AdminPricingRoute
-  AdminPromotionsRoute: typeof AdminPromotionsRoute
-  AdminReportsRoute: typeof AdminReportsRoute
-  AdminSupportRoute: typeof AdminSupportRoute
-}
-
-const AdminRouteChildren: AdminRouteChildren = {
-  AdminBookingsRoute: AdminBookingsRoute,
-  AdminCustomersRoute: AdminCustomersRoute,
-  AdminDriversRoute: AdminDriversRoute,
-  AdminPricingRoute: AdminPricingRoute,
-  AdminPromotionsRoute: AdminPromotionsRoute,
-  AdminReportsRoute: AdminReportsRoute,
-  AdminSupportRoute: AdminSupportRoute,
-}
-
-const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
-
 interface BookingRouteChildren {
   BookingIdRoute: typeof BookingIdRoute
   BookingSearchingRoute: typeof BookingSearchingRoute
@@ -764,7 +749,6 @@ const BookingRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AddressesRoute: AddressesRoute,
-  AdminRoute: AdminRouteWithChildren,
   BookingRoute: BookingRouteWithChildren,
   ChangePasswordRoute: ChangePasswordRoute,
   HomeRoute: HomeRoute,
@@ -782,9 +766,17 @@ const rootRouteChildren: RootRouteChildren = {
   VehiclesRoute: VehiclesRoute,
   VerifyOtpRoute: VerifyOtpRoute,
   WalletRoute: WalletRoute,
+  AdminBookingsRoute: AdminBookingsRoute,
+  AdminCustomersRoute: AdminCustomersRoute,
+  AdminDriversRoute: AdminDriversRoute,
+  AdminPricingRoute: AdminPricingRoute,
+  AdminPromotionsRoute: AdminPromotionsRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminSupportRoute: AdminSupportRoute,
   DriverEarningsRoute: DriverEarningsRoute,
   DriverLoginRoute: DriverLoginRoute,
   DriverProfileRoute: DriverProfileRoute,
+  AdminIndexRoute: AdminIndexRoute,
   DriverIndexRoute: DriverIndexRoute,
   DriverTripsIdRoute: DriverTripsIdRoute,
   DriverTripsIndexRoute: DriverTripsIndexRoute,

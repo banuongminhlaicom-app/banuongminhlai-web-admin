@@ -5,7 +5,7 @@ import { MOCK_TRIPS, TRIP_STATUS_LABEL } from "@/lib/mock";
 import { formatVND } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/admin")({
+export const Route = createFileRoute("/admin/")({
   head: () => ({ meta: [{ title: "Admin · Tổng quan" }] }),
   component: AdminDashboard,
 });
@@ -119,7 +119,7 @@ function RevenueChart() {
   const max = Math.max(...data);
   const labels = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
   return (
-    <div className="flex h-40 items-end gap-2">
+    <div className="flex h-40 items-stretch gap-2">
       {data.map((v, i) => (
         <div key={i} className="group flex flex-1 flex-col items-center gap-1">
           <div className="flex w-full flex-1 items-end">
