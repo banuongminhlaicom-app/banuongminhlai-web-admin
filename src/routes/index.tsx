@@ -1,24 +1,35 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { BrandLogo } from "@/components/BrandLogo";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  component: Splash,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function Splash() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const t = setTimeout(() => navigate({ to: "/onboarding" }), 1800);
+    return () => clearTimeout(t);
+  }, [navigate]);
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-between bg-background px-8 py-16 gradient-hero">
+      <div />
+      <div className="flex flex-col items-center gap-6 text-center animate-in fade-in zoom-in-95 duration-700">
+        <BrandLogo size="lg" showText={false} />
+        <div>
+          <div className="text-3xl font-black tracking-tight">BẠN UỐNG</div>
+          <div className="text-3xl font-black tracking-tight text-primary">MÌNH LÁI</div>
+        </div>
+        <p className="max-w-xs text-sm text-muted-foreground">An toàn cho bạn – Trọn vẹn cuộc vui</p>
+      </div>
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
+          <div className="h-full w-1/2 animate-pulse gradient-primary" />
+        </div>
+        <Link to="/onboarding" className="text-xs text-muted-foreground">Bỏ qua</Link>
+      </div>
     </div>
   );
 }

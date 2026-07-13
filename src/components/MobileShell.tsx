@@ -1,0 +1,59 @@
+import { Link, useRouterState } from "@tanstack/react-router";
+import { Home, Route as RouteIcon, Calendar, Tag, User, Plus } from "lucide-react";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+const TABS = [
+  { to: "/home", label: "Trang chủ", Icon: Home },
+  { to: "/trips", label: "Chuyến đi", Icon: RouteIcon },
+  { to: "/schedule", label: "Đặt lịch", Icon: Plus, center: true },
+  { to: "/promotions", label: "Ưu đãi", Icon: Tag },
+  { to: "/profile", label: "Tài khoản", Icon: User },
+] as const;
+
+export function MobileShell({ children, hideNav = false }: { children: ReactNode; hideNav?: boolean }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return (
+    <div className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
+      <main className={cn("flex-1", !hideNav && "pb-28")}>{children}</main>
+      {!hideNav && <BottomNav pathname={pathname} />}
+    </div>
+  );
+}
+
+function BottomNav({ pathname }: { pathname: string }) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md safe-bottom">
+      <div className="mx-3 mb-3 rounded-3xl border border-border bg-surface/95 px-2 py-2 backdrop-blur-xl shadow-elevated">
+        <ul className="grid grid-cols-5 items-end">
+          {TABS.map(({ to, label, Icon, center }) => {
+            const active = pathname === to || (to !== "/home" && pathname.startsWith(to));
+            if (center) {
+              return (
+                <li key={to} className="flex justify-center">
+                  <Link to={to} className="grid h-14 w-14 -translate-y-4 place-items-center rounded-full gradient-primary text-primary-foreground shadow-glow ring-4 ring-background">
+                    <Icon className="h-6 w-6" />
+                  </Link>
+                </li>
+              );
+            }
+            return (
+              <li key={to}>
+                <Link
+                  to={to}
+                  className={cn(
+                    "flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium transition-colors",
+                    active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Icon className={cn("h-5 w-5", active && "scale-110")} />
+                  <span>{label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </nav>
+  );
+}
