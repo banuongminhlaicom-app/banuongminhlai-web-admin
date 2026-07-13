@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CheckCircle2, LogOut, Star } from "lucide-react";
 import { toast } from "sonner";
 import { DriverShell } from "@/components/DriverShell";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { driverStore } from "@/lib/driver-store";
 
 export const Route = createFileRoute("/driver/profile")({
