@@ -25,7 +25,7 @@ import { DEMO_TRIP, driverStore, useDriver } from "@/lib/driver-store";
 import { formatVND } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/driver")({
+export const Route = createFileRoute("/driver/")({
   head: () => ({ meta: [{ title: "Tài xế — Bạn Uống Mình Lái" }] }),
   component: DriverHome,
 });
