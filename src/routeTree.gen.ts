@@ -30,7 +30,6 @@ import { Route as BookingRouteImport } from './routes/booking'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AddressesRouteImport } from './routes/addresses'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DriverRequestsRouteImport } from './routes/driver.requests'
 import { Route as DriverProfileRouteImport } from './routes/driver.profile'
 import { Route as DriverEarningsRouteImport } from './routes/driver.earnings'
 import { Route as BookingSearchingRouteImport } from './routes/booking.searching'
@@ -149,11 +148,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DriverRequestsRoute = DriverRequestsRouteImport.update({
-  id: '/requests',
-  path: '/requests',
-  getParentRoute: () => DriverRoute,
-} as any)
 const DriverProfileRoute = DriverProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
@@ -248,7 +242,6 @@ export interface FileRoutesByFullPath {
   '/booking/searching': typeof BookingSearchingRoute
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/profile': typeof DriverProfileRoute
-  '/driver/requests': typeof DriverRequestsRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
 }
 export interface FileRoutesByTo {
@@ -284,7 +277,6 @@ export interface FileRoutesByTo {
   '/booking/searching': typeof BookingSearchingRoute
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/profile': typeof DriverProfileRoute
-  '/driver/requests': typeof DriverRequestsRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
 }
 export interface FileRoutesById {
@@ -321,7 +313,6 @@ export interface FileRoutesById {
   '/booking/searching': typeof BookingSearchingRoute
   '/driver/earnings': typeof DriverEarningsRoute
   '/driver/profile': typeof DriverProfileRoute
-  '/driver/requests': typeof DriverRequestsRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
 }
 export interface FileRouteTypes {
@@ -359,7 +350,6 @@ export interface FileRouteTypes {
     | '/booking/searching'
     | '/driver/earnings'
     | '/driver/profile'
-    | '/driver/requests'
     | '/driver/trips/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -395,7 +385,6 @@ export interface FileRouteTypes {
     | '/booking/searching'
     | '/driver/earnings'
     | '/driver/profile'
-    | '/driver/requests'
     | '/driver/trips/$id'
   id:
     | '__root__'
@@ -431,7 +420,6 @@ export interface FileRouteTypes {
     | '/booking/searching'
     | '/driver/earnings'
     | '/driver/profile'
-    | '/driver/requests'
     | '/driver/trips/$id'
   fileRoutesById: FileRoutesById
 }
@@ -608,13 +596,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/driver/requests': {
-      id: '/driver/requests'
-      path: '/requests'
-      fullPath: '/driver/requests'
-      preLoaderRoute: typeof DriverRequestsRouteImport
-      parentRoute: typeof DriverRoute
-    }
     '/driver/profile': {
       id: '/driver/profile'
       path: '/profile'
@@ -740,14 +721,12 @@ const BookingRouteWithChildren =
 interface DriverRouteChildren {
   DriverEarningsRoute: typeof DriverEarningsRoute
   DriverProfileRoute: typeof DriverProfileRoute
-  DriverRequestsRoute: typeof DriverRequestsRoute
   DriverTripsIdRoute: typeof DriverTripsIdRoute
 }
 
 const DriverRouteChildren: DriverRouteChildren = {
   DriverEarningsRoute: DriverEarningsRoute,
   DriverProfileRoute: DriverProfileRoute,
-  DriverRequestsRoute: DriverRequestsRoute,
   DriverTripsIdRoute: DriverTripsIdRoute,
 }
 
@@ -780,13 +759,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
