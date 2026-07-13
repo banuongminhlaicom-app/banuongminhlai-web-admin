@@ -3,13 +3,14 @@ import { Home, Route as RouteIcon, Calendar, Tag, User, Plus } from "lucide-reac
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-const TABS = [
+type Tab = { to: "/home" | "/trips" | "/schedule" | "/promotions" | "/profile"; label: string; Icon: typeof Home; center?: boolean };
+const TABS: Tab[] = [
   { to: "/home", label: "Trang chủ", Icon: Home },
   { to: "/trips", label: "Chuyến đi", Icon: RouteIcon },
   { to: "/schedule", label: "Đặt lịch", Icon: Plus, center: true },
   { to: "/promotions", label: "Ưu đãi", Icon: Tag },
   { to: "/profile", label: "Tài khoản", Icon: User },
-] as const;
+];
 
 export function MobileShell({ children, hideNav = false }: { children: ReactNode; hideNav?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });

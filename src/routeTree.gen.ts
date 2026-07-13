@@ -9,38 +9,558 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WalletRouteImport } from './routes/wallet'
+import { Route as VerifyOtpRouteImport } from './routes/verify-otp'
+import { Route as VehiclesRouteImport } from './routes/vehicles'
+import { Route as TripsRouteImport } from './routes/trips'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SupportRouteImport } from './routes/support'
+import { Route as ScheduleRouteImport } from './routes/schedule'
+import { Route as PromotionsRouteImport } from './routes/promotions'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as HomeRouteImport } from './routes/home'
+import { Route as DriverRouteImport } from './routes/driver'
+import { Route as BookingRouteImport } from './routes/booking'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AddressesRouteImport } from './routes/addresses'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DriverRequestsRouteImport } from './routes/driver.requests'
+import { Route as DriverProfileRouteImport } from './routes/driver.profile'
+import { Route as DriverEarningsRouteImport } from './routes/driver.earnings'
+import { Route as BookingSearchingRouteImport } from './routes/booking.searching'
+import { Route as BookingIdRouteImport } from './routes/booking.$id'
+import { Route as AdminSupportRouteImport } from './routes/admin.support'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminPromotionsRouteImport } from './routes/admin.promotions'
+import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
+import { Route as AdminDriversRouteImport } from './routes/admin.drivers'
+import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
+import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
+import { Route as DriverTripsIdRouteImport } from './routes/driver.trips.$id'
 
+const WalletRoute = WalletRouteImport.update({
+  id: '/wallet',
+  path: '/wallet',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyOtpRoute = VerifyOtpRouteImport.update({
+  id: '/verify-otp',
+  path: '/verify-otp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VehiclesRoute = VehiclesRouteImport.update({
+  id: '/vehicles',
+  path: '/vehicles',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TripsRoute = TripsRouteImport.update({
+  id: '/trips',
+  path: '/trips',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScheduleRoute = ScheduleRouteImport.update({
+  id: '/schedule',
+  path: '/schedule',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromotionsRoute = PromotionsRouteImport.update({
+  id: '/promotions',
+  path: '/promotions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HomeRoute = HomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriverRoute = DriverRouteImport.update({
+  id: '/driver',
+  path: '/driver',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BookingRoute = BookingRouteImport.update({
+  id: '/booking',
+  path: '/booking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AddressesRoute = AddressesRouteImport.update({
+  id: '/addresses',
+  path: '/addresses',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DriverRequestsRoute = DriverRequestsRouteImport.update({
+  id: '/requests',
+  path: '/requests',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverProfileRoute = DriverProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => DriverRoute,
+} as any)
+const DriverEarningsRoute = DriverEarningsRouteImport.update({
+  id: '/earnings',
+  path: '/earnings',
+  getParentRoute: () => DriverRoute,
+} as any)
+const BookingSearchingRoute = BookingSearchingRouteImport.update({
+  id: '/searching',
+  path: '/searching',
+  getParentRoute: () => BookingRoute,
+} as any)
+const BookingIdRoute = BookingIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => BookingRoute,
+} as any)
+const AdminSupportRoute = AdminSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPromotionsRoute = AdminPromotionsRouteImport.update({
+  id: '/promotions',
+  path: '/promotions',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPricingRoute = AdminPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDriversRoute = AdminDriversRouteImport.update({
+  id: '/drivers',
+  path: '/drivers',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCustomersRoute = AdminCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBookingsRoute = AdminBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const DriverTripsIdRoute = DriverTripsIdRouteImport.update({
+  id: '/trips/$id',
+  path: '/trips/$id',
+  getParentRoute: () => DriverRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/addresses': typeof AddressesRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/booking': typeof BookingRouteWithChildren
+  '/driver': typeof DriverRouteWithChildren
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/notifications': typeof NotificationsRoute
+  '/onboarding': typeof OnboardingRoute
+  '/privacy': typeof PrivacyRoute
+  '/profile': typeof ProfileRoute
+  '/promotions': typeof PromotionsRoute
+  '/schedule': typeof ScheduleRoute
+  '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
+  '/trips': typeof TripsRoute
+  '/vehicles': typeof VehiclesRoute
+  '/verify-otp': typeof VerifyOtpRoute
+  '/wallet': typeof WalletRoute
+  '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/customers': typeof AdminCustomersRoute
+  '/admin/drivers': typeof AdminDriversRoute
+  '/admin/pricing': typeof AdminPricingRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/booking/$id': typeof BookingIdRoute
+  '/booking/searching': typeof BookingSearchingRoute
+  '/driver/earnings': typeof DriverEarningsRoute
+  '/driver/profile': typeof DriverProfileRoute
+  '/driver/requests': typeof DriverRequestsRoute
+  '/driver/trips/$id': typeof DriverTripsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/addresses': typeof AddressesRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/booking': typeof BookingRouteWithChildren
+  '/driver': typeof DriverRouteWithChildren
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/notifications': typeof NotificationsRoute
+  '/onboarding': typeof OnboardingRoute
+  '/privacy': typeof PrivacyRoute
+  '/profile': typeof ProfileRoute
+  '/promotions': typeof PromotionsRoute
+  '/schedule': typeof ScheduleRoute
+  '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
+  '/trips': typeof TripsRoute
+  '/vehicles': typeof VehiclesRoute
+  '/verify-otp': typeof VerifyOtpRoute
+  '/wallet': typeof WalletRoute
+  '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/customers': typeof AdminCustomersRoute
+  '/admin/drivers': typeof AdminDriversRoute
+  '/admin/pricing': typeof AdminPricingRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/booking/$id': typeof BookingIdRoute
+  '/booking/searching': typeof BookingSearchingRoute
+  '/driver/earnings': typeof DriverEarningsRoute
+  '/driver/profile': typeof DriverProfileRoute
+  '/driver/requests': typeof DriverRequestsRoute
+  '/driver/trips/$id': typeof DriverTripsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/addresses': typeof AddressesRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/booking': typeof BookingRouteWithChildren
+  '/driver': typeof DriverRouteWithChildren
+  '/home': typeof HomeRoute
+  '/login': typeof LoginRoute
+  '/notifications': typeof NotificationsRoute
+  '/onboarding': typeof OnboardingRoute
+  '/privacy': typeof PrivacyRoute
+  '/profile': typeof ProfileRoute
+  '/promotions': typeof PromotionsRoute
+  '/schedule': typeof ScheduleRoute
+  '/support': typeof SupportRoute
+  '/terms': typeof TermsRoute
+  '/trips': typeof TripsRoute
+  '/vehicles': typeof VehiclesRoute
+  '/verify-otp': typeof VerifyOtpRoute
+  '/wallet': typeof WalletRoute
+  '/admin/bookings': typeof AdminBookingsRoute
+  '/admin/customers': typeof AdminCustomersRoute
+  '/admin/drivers': typeof AdminDriversRoute
+  '/admin/pricing': typeof AdminPricingRoute
+  '/admin/promotions': typeof AdminPromotionsRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/support': typeof AdminSupportRoute
+  '/booking/$id': typeof BookingIdRoute
+  '/booking/searching': typeof BookingSearchingRoute
+  '/driver/earnings': typeof DriverEarningsRoute
+  '/driver/profile': typeof DriverProfileRoute
+  '/driver/requests': typeof DriverRequestsRoute
+  '/driver/trips/$id': typeof DriverTripsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/addresses'
+    | '/admin'
+    | '/booking'
+    | '/driver'
+    | '/home'
+    | '/login'
+    | '/notifications'
+    | '/onboarding'
+    | '/privacy'
+    | '/profile'
+    | '/promotions'
+    | '/schedule'
+    | '/support'
+    | '/terms'
+    | '/trips'
+    | '/vehicles'
+    | '/verify-otp'
+    | '/wallet'
+    | '/admin/bookings'
+    | '/admin/customers'
+    | '/admin/drivers'
+    | '/admin/pricing'
+    | '/admin/promotions'
+    | '/admin/reports'
+    | '/admin/support'
+    | '/booking/$id'
+    | '/booking/searching'
+    | '/driver/earnings'
+    | '/driver/profile'
+    | '/driver/requests'
+    | '/driver/trips/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/addresses'
+    | '/admin'
+    | '/booking'
+    | '/driver'
+    | '/home'
+    | '/login'
+    | '/notifications'
+    | '/onboarding'
+    | '/privacy'
+    | '/profile'
+    | '/promotions'
+    | '/schedule'
+    | '/support'
+    | '/terms'
+    | '/trips'
+    | '/vehicles'
+    | '/verify-otp'
+    | '/wallet'
+    | '/admin/bookings'
+    | '/admin/customers'
+    | '/admin/drivers'
+    | '/admin/pricing'
+    | '/admin/promotions'
+    | '/admin/reports'
+    | '/admin/support'
+    | '/booking/$id'
+    | '/booking/searching'
+    | '/driver/earnings'
+    | '/driver/profile'
+    | '/driver/requests'
+    | '/driver/trips/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/addresses'
+    | '/admin'
+    | '/booking'
+    | '/driver'
+    | '/home'
+    | '/login'
+    | '/notifications'
+    | '/onboarding'
+    | '/privacy'
+    | '/profile'
+    | '/promotions'
+    | '/schedule'
+    | '/support'
+    | '/terms'
+    | '/trips'
+    | '/vehicles'
+    | '/verify-otp'
+    | '/wallet'
+    | '/admin/bookings'
+    | '/admin/customers'
+    | '/admin/drivers'
+    | '/admin/pricing'
+    | '/admin/promotions'
+    | '/admin/reports'
+    | '/admin/support'
+    | '/booking/$id'
+    | '/booking/searching'
+    | '/driver/earnings'
+    | '/driver/profile'
+    | '/driver/requests'
+    | '/driver/trips/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AddressesRoute: typeof AddressesRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  BookingRoute: typeof BookingRouteWithChildren
+  DriverRoute: typeof DriverRouteWithChildren
+  HomeRoute: typeof HomeRoute
+  LoginRoute: typeof LoginRoute
+  NotificationsRoute: typeof NotificationsRoute
+  OnboardingRoute: typeof OnboardingRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ProfileRoute: typeof ProfileRoute
+  PromotionsRoute: typeof PromotionsRoute
+  ScheduleRoute: typeof ScheduleRoute
+  SupportRoute: typeof SupportRoute
+  TermsRoute: typeof TermsRoute
+  TripsRoute: typeof TripsRoute
+  VehiclesRoute: typeof VehiclesRoute
+  VerifyOtpRoute: typeof VerifyOtpRoute
+  WalletRoute: typeof WalletRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wallet': {
+      id: '/wallet'
+      path: '/wallet'
+      fullPath: '/wallet'
+      preLoaderRoute: typeof WalletRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-otp': {
+      id: '/verify-otp'
+      path: '/verify-otp'
+      fullPath: '/verify-otp'
+      preLoaderRoute: typeof VerifyOtpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/vehicles': {
+      id: '/vehicles'
+      path: '/vehicles'
+      fullPath: '/vehicles'
+      preLoaderRoute: typeof VehiclesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trips': {
+      id: '/trips'
+      path: '/trips'
+      fullPath: '/trips'
+      preLoaderRoute: typeof TripsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/schedule': {
+      id: '/schedule'
+      path: '/schedule'
+      fullPath: '/schedule'
+      preLoaderRoute: typeof ScheduleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/promotions': {
+      id: '/promotions'
+      path: '/promotions'
+      fullPath: '/promotions'
+      preLoaderRoute: typeof PromotionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/home': {
+      id: '/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof HomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/driver': {
+      id: '/driver'
+      path: '/driver'
+      fullPath: '/driver'
+      preLoaderRoute: typeof DriverRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/booking': {
+      id: '/booking'
+      path: '/booking'
+      fullPath: '/booking'
+      preLoaderRoute: typeof BookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/addresses': {
+      id: '/addresses'
+      path: '/addresses'
+      fullPath: '/addresses'
+      preLoaderRoute: typeof AddressesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +568,173 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/driver/requests': {
+      id: '/driver/requests'
+      path: '/requests'
+      fullPath: '/driver/requests'
+      preLoaderRoute: typeof DriverRequestsRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/profile': {
+      id: '/driver/profile'
+      path: '/profile'
+      fullPath: '/driver/profile'
+      preLoaderRoute: typeof DriverProfileRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/driver/earnings': {
+      id: '/driver/earnings'
+      path: '/earnings'
+      fullPath: '/driver/earnings'
+      preLoaderRoute: typeof DriverEarningsRouteImport
+      parentRoute: typeof DriverRoute
+    }
+    '/booking/searching': {
+      id: '/booking/searching'
+      path: '/searching'
+      fullPath: '/booking/searching'
+      preLoaderRoute: typeof BookingSearchingRouteImport
+      parentRoute: typeof BookingRoute
+    }
+    '/booking/$id': {
+      id: '/booking/$id'
+      path: '/$id'
+      fullPath: '/booking/$id'
+      preLoaderRoute: typeof BookingIdRouteImport
+      parentRoute: typeof BookingRoute
+    }
+    '/admin/support': {
+      id: '/admin/support'
+      path: '/support'
+      fullPath: '/admin/support'
+      preLoaderRoute: typeof AdminSupportRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/promotions': {
+      id: '/admin/promotions'
+      path: '/promotions'
+      fullPath: '/admin/promotions'
+      preLoaderRoute: typeof AdminPromotionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pricing': {
+      id: '/admin/pricing'
+      path: '/pricing'
+      fullPath: '/admin/pricing'
+      preLoaderRoute: typeof AdminPricingRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/drivers': {
+      id: '/admin/drivers'
+      path: '/drivers'
+      fullPath: '/admin/drivers'
+      preLoaderRoute: typeof AdminDriversRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/customers': {
+      id: '/admin/customers'
+      path: '/customers'
+      fullPath: '/admin/customers'
+      preLoaderRoute: typeof AdminCustomersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/bookings': {
+      id: '/admin/bookings'
+      path: '/bookings'
+      fullPath: '/admin/bookings'
+      preLoaderRoute: typeof AdminBookingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/driver/trips/$id': {
+      id: '/driver/trips/$id'
+      path: '/trips/$id'
+      fullPath: '/driver/trips/$id'
+      preLoaderRoute: typeof DriverTripsIdRouteImport
+      parentRoute: typeof DriverRoute
+    }
   }
 }
 
+interface AdminRouteChildren {
+  AdminBookingsRoute: typeof AdminBookingsRoute
+  AdminCustomersRoute: typeof AdminCustomersRoute
+  AdminDriversRoute: typeof AdminDriversRoute
+  AdminPricingRoute: typeof AdminPricingRoute
+  AdminPromotionsRoute: typeof AdminPromotionsRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminSupportRoute: typeof AdminSupportRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminBookingsRoute: AdminBookingsRoute,
+  AdminCustomersRoute: AdminCustomersRoute,
+  AdminDriversRoute: AdminDriversRoute,
+  AdminPricingRoute: AdminPricingRoute,
+  AdminPromotionsRoute: AdminPromotionsRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminSupportRoute: AdminSupportRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface BookingRouteChildren {
+  BookingIdRoute: typeof BookingIdRoute
+  BookingSearchingRoute: typeof BookingSearchingRoute
+}
+
+const BookingRouteChildren: BookingRouteChildren = {
+  BookingIdRoute: BookingIdRoute,
+  BookingSearchingRoute: BookingSearchingRoute,
+}
+
+const BookingRouteWithChildren =
+  BookingRoute._addFileChildren(BookingRouteChildren)
+
+interface DriverRouteChildren {
+  DriverEarningsRoute: typeof DriverEarningsRoute
+  DriverProfileRoute: typeof DriverProfileRoute
+  DriverRequestsRoute: typeof DriverRequestsRoute
+  DriverTripsIdRoute: typeof DriverTripsIdRoute
+}
+
+const DriverRouteChildren: DriverRouteChildren = {
+  DriverEarningsRoute: DriverEarningsRoute,
+  DriverProfileRoute: DriverProfileRoute,
+  DriverRequestsRoute: DriverRequestsRoute,
+  DriverTripsIdRoute: DriverTripsIdRoute,
+}
+
+const DriverRouteWithChildren =
+  DriverRoute._addFileChildren(DriverRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AddressesRoute: AddressesRoute,
+  AdminRoute: AdminRouteWithChildren,
+  BookingRoute: BookingRouteWithChildren,
+  DriverRoute: DriverRouteWithChildren,
+  HomeRoute: HomeRoute,
+  LoginRoute: LoginRoute,
+  NotificationsRoute: NotificationsRoute,
+  OnboardingRoute: OnboardingRoute,
+  PrivacyRoute: PrivacyRoute,
+  ProfileRoute: ProfileRoute,
+  PromotionsRoute: PromotionsRoute,
+  ScheduleRoute: ScheduleRoute,
+  SupportRoute: SupportRoute,
+  TermsRoute: TermsRoute,
+  TripsRoute: TripsRoute,
+  VehiclesRoute: VehiclesRoute,
+  VerifyOtpRoute: VerifyOtpRoute,
+  WalletRoute: WalletRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
