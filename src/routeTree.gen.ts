@@ -151,19 +151,19 @@ const DriverIndexRoute = DriverIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const DriverProfileRoute = DriverProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => DriverRoute,
+  id: '/driver/profile',
+  path: '/driver/profile',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DriverLoginRoute = DriverLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => DriverRoute,
+  id: '/driver/login',
+  path: '/driver/login',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DriverEarningsRoute = DriverEarningsRouteImport.update({
-  id: '/earnings',
-  path: '/earnings',
-  getParentRoute: () => DriverRoute,
+  id: '/driver/earnings',
+  path: '/driver/earnings',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const BookingSearchingRoute = BookingSearchingRouteImport.update({
   id: '/searching',
@@ -211,14 +211,14 @@ const AdminBookingsRoute = AdminBookingsRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any)
 const DriverTripsIndexRoute = DriverTripsIndexRouteImport.update({
-  id: '/trips/',
-  path: '/trips/',
-  getParentRoute: () => DriverRoute,
+  id: '/driver/trips/',
+  path: '/driver/trips/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DriverTripsIdRoute = DriverTripsIdRouteImport.update({
-  id: '/trips/$id',
-  path: '/trips/$id',
-  getParentRoute: () => DriverRoute,
+  id: '/driver/trips/$id',
+  path: '/driver/trips/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -468,7 +468,12 @@ export interface RootRouteChildren {
   VehiclesRoute: typeof VehiclesRoute
   VerifyOtpRoute: typeof VerifyOtpRoute
   WalletRoute: typeof WalletRoute
+  DriverEarningsRoute: typeof DriverEarningsRoute
+  DriverLoginRoute: typeof DriverLoginRoute
+  DriverProfileRoute: typeof DriverProfileRoute
   DriverIndexRoute: typeof DriverIndexRoute
+  DriverTripsIdRoute: typeof DriverTripsIdRoute
+  DriverTripsIndexRoute: typeof DriverTripsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -622,24 +627,24 @@ declare module '@tanstack/react-router' {
     }
     '/driver/profile': {
       id: '/driver/profile'
-      path: '/profile'
+      path: '/driver/profile'
       fullPath: '/driver/profile'
       preLoaderRoute: typeof DriverProfileRouteImport
-      parentRoute: typeof DriverRoute
+      parentRoute: typeof rootRouteImport
     }
     '/driver/login': {
       id: '/driver/login'
-      path: '/login'
+      path: '/driver/login'
       fullPath: '/driver/login'
       preLoaderRoute: typeof DriverLoginRouteImport
-      parentRoute: typeof DriverRoute
+      parentRoute: typeof rootRouteImport
     }
     '/driver/earnings': {
       id: '/driver/earnings'
-      path: '/earnings'
+      path: '/driver/earnings'
       fullPath: '/driver/earnings'
       preLoaderRoute: typeof DriverEarningsRouteImport
-      parentRoute: typeof DriverRoute
+      parentRoute: typeof rootRouteImport
     }
     '/booking/searching': {
       id: '/booking/searching'
@@ -706,17 +711,17 @@ declare module '@tanstack/react-router' {
     }
     '/driver/trips/': {
       id: '/driver/trips/'
-      path: '/trips'
+      path: '/driver/trips'
       fullPath: '/driver/trips/'
       preLoaderRoute: typeof DriverTripsIndexRouteImport
-      parentRoute: typeof DriverRoute
+      parentRoute: typeof rootRouteImport
     }
     '/driver/trips/$id': {
       id: '/driver/trips/$id'
-      path: '/trips/$id'
+      path: '/driver/trips/$id'
       fullPath: '/driver/trips/$id'
       preLoaderRoute: typeof DriverTripsIdRouteImport
-      parentRoute: typeof DriverRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -777,7 +782,12 @@ const rootRouteChildren: RootRouteChildren = {
   VehiclesRoute: VehiclesRoute,
   VerifyOtpRoute: VerifyOtpRoute,
   WalletRoute: WalletRoute,
+  DriverEarningsRoute: DriverEarningsRoute,
+  DriverLoginRoute: DriverLoginRoute,
+  DriverProfileRoute: DriverProfileRoute,
   DriverIndexRoute: DriverIndexRoute,
+  DriverTripsIdRoute: DriverTripsIdRoute,
+  DriverTripsIndexRoute: DriverTripsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
