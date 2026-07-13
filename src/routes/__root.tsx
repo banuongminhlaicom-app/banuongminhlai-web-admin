@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { useTheme } from "../hooks/use-theme";
 
 function NotFoundComponent() {
   return (
@@ -90,10 +91,11 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { theme } = useTheme();
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      <Toaster theme="dark" position="top-center" richColors />
+      <Toaster theme={theme} position="top-center" richColors />
     </QueryClientProvider>
   );
 }

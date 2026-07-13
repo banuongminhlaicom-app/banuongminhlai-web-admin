@@ -4,6 +4,7 @@ import { MobileShell } from "@/components/MobileShell";
 import { MapPreview } from "@/components/MapPreview";
 import { EmergencyButton } from "@/components/EmergencyButton";
 import { BrandLogo } from "@/components/BrandLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { greetingByHour } from "@/lib/format";
 import { SAVED_ADDRESSES } from "@/lib/mock";
 
@@ -24,10 +25,13 @@ function HomeScreen() {
               <div className="text-sm font-bold">Nguyễn Văn An</div>
             </div>
           </div>
-          <Link to="/notifications" className="relative grid h-10 w-10 place-items-center rounded-full bg-surface">
-            <Bell className="h-5 w-5" />
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link to="/notifications" className="relative grid h-10 w-10 place-items-center rounded-full bg-surface">
+              <Bell className="h-5 w-5" />
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />
+            </Link>
+          </div>
         </div>
 
         <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
