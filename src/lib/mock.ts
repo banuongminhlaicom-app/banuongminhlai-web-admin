@@ -103,9 +103,9 @@ export const MOCK_NOTIFICATIONS: AppNotification[] = [
 ];
 
 export const VEHICLE_TYPES = [
-  { id: "moto", label: "Xe máy", desc: "Đón nhanh, tiết kiệm", icon: "🏍️", multiplier: 0.6 },
+  { id: "moto", label: "Xe máy", desc: "Đón nhanh, tiết kiệm", icon: "🏍️", multiplier: 0.8 },
   { id: "auto", label: "Ô tô số tự động", desc: "Phổ biến nhất", icon: "🚗", multiplier: 1 },
-  { id: "manual", label: "Ô tô số sàn", desc: "Yêu cầu tài xế hạng B2+", icon: "🚙", multiplier: 1.05 },
+  { id: "manual", label: "Ô tô số sàn", desc: "Yêu cầu tài xế hạng B2+", icon: "🚙", multiplier: 1.1 },
   { id: "7seat", label: "Xe từ 7 chỗ", desc: "Nhóm bạn, gia đình", icon: "🚐", multiplier: 1.25 },
 ];
 
