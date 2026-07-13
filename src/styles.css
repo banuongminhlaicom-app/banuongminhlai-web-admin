@@ -76,6 +76,40 @@
   --shadow-glow: 0 8px 32px -8px oklch(0.62 0.22 25 / 0.5);
 }
 
+.light {
+  --background: oklch(0.99 0.003 260);
+  --foreground: oklch(0.18 0.01 260);
+  --surface: oklch(1 0 0);
+  --surface-elevated: oklch(0.97 0.005 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.01 260);
+  --primary: oklch(0.58 0.22 25);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.95 0.005 260);
+  --secondary-foreground: oklch(0.2 0.01 260);
+  --muted: oklch(0.95 0.005 260);
+  --muted-foreground: oklch(0.5 0.015 260);
+  --accent: oklch(0.94 0.03 25);
+  --accent-foreground: oklch(0.25 0.05 25);
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.6 0.16 145);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.72 0.16 75);
+  --warning-foreground: oklch(0.2 0.02 75);
+  --border: oklch(0 0 0 / 8%);
+  --input: oklch(0 0 0 / 10%);
+  --ring: oklch(0.58 0.22 25);
+
+  --gradient-hero: linear-gradient(135deg, oklch(0.98 0.01 260) 0%, oklch(0.94 0.02 25) 100%);
+  --gradient-primary: linear-gradient(135deg, oklch(0.62 0.24 25) 0%, oklch(0.52 0.2 20) 100%);
+  --shadow-elevated: 0 20px 40px -20px oklch(0.4 0.05 260 / 0.25);
+  --shadow-glow: 0 8px 32px -8px oklch(0.58 0.22 25 / 0.35);
+}
+
+
 @layer base {
   * {
     border-color: var(--color-border);
