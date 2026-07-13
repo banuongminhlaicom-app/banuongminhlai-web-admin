@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Car, ChevronRight, CreditCard, Headphones, LogOut, MapPin, Shield, Star, User, Wallet } from "lucide-react";
+import { Award, Car, ChevronRight, CreditCard, Headphones, KeyRound, LogOut, MapPin, Shield, Star, User, Wallet } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
@@ -10,10 +10,12 @@ export const Route = createFileRoute("/profile")({
 });
 
 const ITEMS = [
+  { label: "Điểm thưởng", Icon: Award, to: "/rewards" },
   { label: "Ví & thanh toán", Icon: Wallet, to: "/wallet" },
   { label: "Phương tiện của tôi", Icon: Car, to: "/vehicles" },
   { label: "Địa chỉ đã lưu", Icon: MapPin, to: "/addresses" },
   { label: "Phương thức thanh toán", Icon: CreditCard, to: "/wallet" },
+  { label: "Đổi mật khẩu", Icon: KeyRound, to: "/change-password" },
   { label: "Trung tâm hỗ trợ", Icon: Headphones, to: "/support" },
   { label: "Điều khoản & bảo mật", Icon: Shield, to: "/terms" },
 ] as const;
