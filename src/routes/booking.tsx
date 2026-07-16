@@ -98,8 +98,13 @@ function Booking() {
   const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(
     null,
   );
-  const pickupInputRef = useRef<HTMLInputElement>(null);
-  const destinationInputRef = useRef<HTMLInputElement>(null);
+  const [pickupSuggestions, setPickupSuggestions] = useState<google.maps.places.PlacePrediction[]>(
+    [],
+  );
+  const [destinationSuggestions, setDestinationSuggestions] = useState<
+    google.maps.places.PlacePrediction[]
+  >([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [vehicle, setVehicle] = useState("auto");
   const [when, setWhen] = useState<"now" | "later">("now");
   const [scheduled, setScheduled] = useState<{ date: string; time: string } | null>(null);
@@ -123,60 +128,69 @@ function Booking() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Gắn Places Autocomplete vào 2 ô địa chỉ (chỉ khi đã cấu hình Google Maps —
-  // nếu chưa, giữ nguyên input text thường như trước, không phá giao diện/luồng cũ).
-  useEffect(() => {
-    if (!isGoogleMapsConfigured) return;
-    let autocompletePickup: google.maps.places.Autocomplete | undefined;
-    let autocompleteDestination: google.maps.places.Autocomplete | undefined;
-
-    loadGoogleMaps().then((g) => {
-      // Cao Lãnh, Đồng Tháp — ưu tiên gợi ý địa chỉ quanh khu vực hoạt động.
-      const bounds = new g.maps.LatLngBounds(
-        { lat: 10.35, lng: 105.5 },
-        { lat: 10.55, lng: 105.75 },
+  // Gợi ý địa điểm kiểu Grab bằng Places API mới (AutocompleteSuggestion) — tự
+  // vẽ dropdown để khớp giao diện sẵn có. Widget Autocomplete cũ đã bị Google
+  // chặn với project mới nên bắt buộc dùng API này. Nếu chưa cấu hình Google
+  // Maps thì ô địa chỉ vẫn là input thường (gõ tay vẫn đặt xe được).
+  async function fetchSuggestions(
+    input: string,
+    setSuggestions: (s: google.maps.places.PlacePrediction[]) => void,
+  ) {
+    if (!isGoogleMapsConfigured || input.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const g = await loadGoogleMaps();
+      const { suggestions } =
+        await g.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input,
+          includedRegionCodes: ["vn"],
+          language: "vi",
+          // Ưu tiên gợi ý quanh Cao Lãnh, Đồng Tháp.
+          locationBias: { center: { lat: 10.457, lng: 105.634 }, radius: 40000 },
+        });
+      setSuggestions(
+        suggestions
+          .map((s) => s.placePrediction)
+          .filter((p): p is google.maps.places.PlacePrediction => p != null),
       );
-      const options: google.maps.places.AutocompleteOptions = {
-        bounds,
-        componentRestrictions: { country: "vn" },
-        fields: ["formatted_address", "geometry", "name"],
-      };
+    } catch {
+      setSuggestions([]);
+    }
+  }
 
-      if (pickupInputRef.current) {
-        autocompletePickup = new g.maps.places.Autocomplete(pickupInputRef.current, options);
-        autocompletePickup.addListener("place_changed", () => {
-          const place = autocompletePickup!.getPlace();
-          const loc = place.geometry?.location;
-          if (loc) {
-            setPickup(place.formatted_address ?? place.name ?? pickupInputRef.current!.value);
-            setPickupCoord({ lat: loc.lat(), lng: loc.lng() });
-          }
-        });
-      }
-      if (destinationInputRef.current) {
-        autocompleteDestination = new g.maps.places.Autocomplete(
-          destinationInputRef.current,
-          options,
-        );
-        autocompleteDestination.addListener("place_changed", () => {
-          const place = autocompleteDestination!.getPlace();
-          const loc = place.geometry?.location;
-          if (loc) {
-            setDestination(
-              place.formatted_address ?? place.name ?? destinationInputRef.current!.value,
-            );
-            setDestinationCoord({ lat: loc.lat(), lng: loc.lng() });
-          }
-        });
-      }
-    });
+  function debouncedFetch(
+    input: string,
+    setSuggestions: (s: google.maps.places.PlacePrediction[]) => void,
+  ) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchSuggestions(input, setSuggestions), 250);
+  }
 
-    return () => {
-      if (autocompletePickup) google.maps.event.clearInstanceListeners(autocompletePickup);
-      if (autocompleteDestination)
-        google.maps.event.clearInstanceListeners(autocompleteDestination);
-    };
-  }, []);
+  async function selectSuggestion(
+    prediction: google.maps.places.PlacePrediction,
+    isPickup: boolean,
+  ) {
+    try {
+      const place = prediction.toPlace();
+      await place.fetchFields({ fields: ["location", "formattedAddress", "displayName"] });
+      const loc = place.location;
+      const addr = place.formattedAddress ?? place.displayName ?? prediction.text.text;
+      const coord = loc ? { lat: loc.lat(), lng: loc.lng() } : null;
+      if (isPickup) {
+        setPickup(addr);
+        setPickupCoord(coord);
+        setPickupSuggestions([]);
+      } else {
+        setDestination(addr);
+        setDestinationCoord(coord);
+        setDestinationSuggestions([]);
+      }
+    } catch {
+      // Lấy chi tiết địa điểm lỗi — giữ nguyên text người dùng đã chọn.
+    }
+  }
 
   // Khi đã có toạ độ thật cả 2 đầu, tính khoảng cách/thời gian thật qua Directions API.
   useEffect(() => {
@@ -322,26 +336,38 @@ function Booking() {
               <div className="h-2.5 w-2.5 rounded-full bg-success" />
             </div>
             <div className="flex-1 space-y-2">
-              <input
-                ref={pickupInputRef}
-                value={pickup}
-                onChange={(e) => {
-                  setPickup(e.target.value);
-                  setPickupCoord(null);
-                }}
-                placeholder="Tài xế sẽ đến đón bạn ở đâu?"
-                className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40"
-              />
-              <input
-                ref={destinationInputRef}
-                value={destination}
-                onChange={(e) => {
-                  setDestination(e.target.value);
-                  setDestinationCoord(null);
-                }}
-                placeholder="Bạn muốn về đâu?"
-                className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-success/40"
-              />
+              <div className="relative">
+                <input
+                  value={pickup}
+                  onChange={(e) => {
+                    setPickup(e.target.value);
+                    setPickupCoord(null);
+                    debouncedFetch(e.target.value, setPickupSuggestions);
+                  }}
+                  placeholder="Tài xế sẽ đến đón bạn ở đâu?"
+                  className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40"
+                />
+                <SuggestionDropdown
+                  items={pickupSuggestions}
+                  onPick={(p) => selectSuggestion(p, true)}
+                />
+              </div>
+              <div className="relative">
+                <input
+                  value={destination}
+                  onChange={(e) => {
+                    setDestination(e.target.value);
+                    setDestinationCoord(null);
+                    debouncedFetch(e.target.value, setDestinationSuggestions);
+                  }}
+                  placeholder="Bạn muốn về đâu?"
+                  className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-success/40"
+                />
+                <SuggestionDropdown
+                  items={destinationSuggestions}
+                  onPick={(p) => selectSuggestion(p, false)}
+                />
+              </div>
             </div>
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
@@ -642,6 +668,32 @@ function Booking() {
           toast.success("Đã lưu phương tiện");
         }}
       />
+    </div>
+  );
+}
+
+function SuggestionDropdown({
+  items,
+  onPick,
+}: {
+  items: google.maps.places.PlacePrediction[];
+  onPick: (p: google.maps.places.PlacePrediction) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-elevated">
+      {items.map((p) => (
+        <button
+          key={p.placeId}
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onPick(p)}
+          className="flex w-full items-start gap-2 border-b border-border/50 px-3 py-2.5 text-left last:border-0 hover:bg-background"
+        >
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span className="text-sm">{p.text.text}</span>
+        </button>
+      ))}
     </div>
   );
 }
