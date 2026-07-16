@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { MapPreview } from "@/components/MapPreview";
 import { useAuthState, useRequireRole } from "@/lib/auth";
+import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/google-maps";
 import {
   createTrip,
   getAddresses,
@@ -90,6 +91,15 @@ function Booking() {
 
   const [pickup, setPickup] = useState("Quán Bia Sài Gòn, Nguyễn Huệ, Cao Lãnh");
   const [destination, setDestination] = useState("Phường Mỹ Phú, Cao Lãnh");
+  const [pickupCoord, setPickupCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [destinationCoord, setDestinationCoord] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
+  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(
+    null,
+  );
+  const pickupInputRef = useRef<HTMLInputElement>(null);
+  const destinationInputRef = useRef<HTMLInputElement>(null);
   const [vehicle, setVehicle] = useState("auto");
   const [when, setWhen] = useState<"now" | "later">("now");
   const [scheduled, setScheduled] = useState<{ date: string; time: string } | null>(null);
@@ -113,8 +123,98 @@ function Booking() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const distanceKm = 6.8;
-  const duration = 18;
+  // Gắn Places Autocomplete vào 2 ô địa chỉ (chỉ khi đã cấu hình Google Maps —
+  // nếu chưa, giữ nguyên input text thường như trước, không phá giao diện/luồng cũ).
+  useEffect(() => {
+    if (!isGoogleMapsConfigured) return;
+    let autocompletePickup: google.maps.places.Autocomplete | undefined;
+    let autocompleteDestination: google.maps.places.Autocomplete | undefined;
+
+    loadGoogleMaps().then((g) => {
+      // Cao Lãnh, Đồng Tháp — ưu tiên gợi ý địa chỉ quanh khu vực hoạt động.
+      const bounds = new g.maps.LatLngBounds(
+        { lat: 10.35, lng: 105.5 },
+        { lat: 10.55, lng: 105.75 },
+      );
+      const options: google.maps.places.AutocompleteOptions = {
+        bounds,
+        componentRestrictions: { country: "vn" },
+        fields: ["formatted_address", "geometry", "name"],
+      };
+
+      if (pickupInputRef.current) {
+        autocompletePickup = new g.maps.places.Autocomplete(pickupInputRef.current, options);
+        autocompletePickup.addListener("place_changed", () => {
+          const place = autocompletePickup!.getPlace();
+          const loc = place.geometry?.location;
+          if (loc) {
+            setPickup(place.formatted_address ?? place.name ?? pickupInputRef.current!.value);
+            setPickupCoord({ lat: loc.lat(), lng: loc.lng() });
+          }
+        });
+      }
+      if (destinationInputRef.current) {
+        autocompleteDestination = new g.maps.places.Autocomplete(
+          destinationInputRef.current,
+          options,
+        );
+        autocompleteDestination.addListener("place_changed", () => {
+          const place = autocompleteDestination!.getPlace();
+          const loc = place.geometry?.location;
+          if (loc) {
+            setDestination(
+              place.formatted_address ?? place.name ?? destinationInputRef.current!.value,
+            );
+            setDestinationCoord({ lat: loc.lat(), lng: loc.lng() });
+          }
+        });
+      }
+    });
+
+    return () => {
+      if (autocompletePickup) google.maps.event.clearInstanceListeners(autocompletePickup);
+      if (autocompleteDestination)
+        google.maps.event.clearInstanceListeners(autocompleteDestination);
+    };
+  }, []);
+
+  // Khi đã có toạ độ thật cả 2 đầu, tính khoảng cách/thời gian thật qua Directions API.
+  useEffect(() => {
+    if (!isGoogleMapsConfigured || !pickupCoord || !destinationCoord) {
+      setRouteInfo(null);
+      return;
+    }
+    let cancelled = false;
+    loadGoogleMaps().then((g) => {
+      if (cancelled) return;
+      const directionsService = new g.maps.DirectionsService();
+      directionsService.route(
+        {
+          origin: pickupCoord,
+          destination: destinationCoord,
+          travelMode: g.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (cancelled) return;
+          if (status === "OK" && result?.routes[0]?.legs[0]) {
+            const leg = result.routes[0].legs[0];
+            setRouteInfo({
+              distanceKm: (leg.distance?.value ?? 0) / 1000,
+              durationMin: (leg.duration?.value ?? 0) / 60,
+            });
+          } else {
+            setRouteInfo(null);
+          }
+        },
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickupCoord, destinationCoord]);
+
+  const distanceKm = routeInfo?.distanceKm ?? 6.8;
+  const duration = routeInfo?.durationMin ?? 18;
   const rule = pricingRow ? pricingRuleRowToRule(pricingRow) : DEFAULT_PRICING;
 
   const quote = useMemo(() => {
@@ -223,14 +323,22 @@ function Booking() {
             </div>
             <div className="flex-1 space-y-2">
               <input
+                ref={pickupInputRef}
                 value={pickup}
-                onChange={(e) => setPickup(e.target.value)}
+                onChange={(e) => {
+                  setPickup(e.target.value);
+                  setPickupCoord(null);
+                }}
                 placeholder="Tài xế sẽ đến đón bạn ở đâu?"
                 className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40"
               />
               <input
+                ref={destinationInputRef}
                 value={destination}
-                onChange={(e) => setDestination(e.target.value)}
+                onChange={(e) => {
+                  setDestination(e.target.value);
+                  setDestinationCoord(null);
+                }}
                 placeholder="Bạn muốn về đâu?"
                 className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-success/40"
               />
@@ -240,7 +348,10 @@ function Booking() {
             {savedAddresses.map((a) => (
               <button
                 key={a.id}
-                onClick={() => setDestination(a.address)}
+                onClick={() => {
+                  setDestination(a.address);
+                  setDestinationCoord(null);
+                }}
                 className="flex shrink-0 items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-xs font-semibold"
               >
                 <span>{a.icon}</span> {a.label}
