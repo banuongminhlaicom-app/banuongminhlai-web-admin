@@ -22,13 +22,17 @@ function Splash() {
           <div className="text-3xl font-black tracking-tight">BẠN UỐNG</div>
           <div className="text-3xl font-black tracking-tight text-primary">MÌNH LÁI</div>
         </div>
-        <p className="max-w-xs text-sm text-muted-foreground">An toàn cho bạn – Trọn vẹn cuộc vui</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          An toàn cho bạn – Trọn vẹn cuộc vui
+        </p>
       </div>
       <div className="flex flex-col items-center gap-3">
         <div className="h-1 w-24 overflow-hidden rounded-full bg-muted">
           <div className="h-full w-1/2 animate-pulse gradient-primary" />
         </div>
-        <Link to="/onboarding" className="text-xs text-muted-foreground">Bỏ qua</Link>
+        <Link to="/onboarding" className="text-xs text-muted-foreground">
+          Bỏ qua
+        </Link>
       </div>
     </div>
   );

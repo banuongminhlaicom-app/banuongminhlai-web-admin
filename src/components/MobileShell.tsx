@@ -17,7 +17,13 @@ const TABS: Tab[] = [
   { to: "/profile", label: "Tài khoản", Icon: User },
 ];
 
-export function MobileShell({ children, hideNav = false }: { children: ReactNode; hideNav?: boolean }) {
+export function MobileShell({
+  children,
+  hideNav = false,
+}: {
+  children: ReactNode;
+  hideNav?: boolean;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <div className="mx-auto flex min-h-[100dvh] w-full max-w-md flex-col bg-background">
@@ -44,7 +50,12 @@ function BottomNav({ pathname }: { pathname: string }) {
                   >
                     <Icon className="h-6 w-6" />
                   </Link>
-                  <span className={cn("-mt-3 text-[10px] font-semibold", active ? "text-primary" : "text-muted-foreground")}>
+                  <span
+                    className={cn(
+                      "-mt-3 text-[10px] font-semibold",
+                      active ? "text-primary" : "text-muted-foreground",
+                    )}
+                  >
                     {label}
                   </span>
                 </li>

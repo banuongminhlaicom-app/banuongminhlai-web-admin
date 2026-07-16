@@ -14,6 +14,23 @@ export function formatMinutes(min: number): string {
   return m ? `${h}h ${m}p` : `${h}h`;
 }
 
+export function formatRelativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 1) return "Vừa xong";
+  if (diffMin < 60) return `${diffMin} phút trước`;
+  const diffHour = Math.round(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} giờ trước`;
+  const diffDay = Math.round(diffHour / 24);
+  if (diffDay === 1) return "Hôm qua";
+  if (diffDay < 7) return `${diffDay} ngày trước`;
+  return new Date(iso).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export function greetingByHour(d = new Date()): string {
   const h = d.getHours();
   if (h < 11) return "Chào buổi sáng";

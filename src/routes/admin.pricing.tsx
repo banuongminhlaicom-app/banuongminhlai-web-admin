@@ -1,9 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { DEFAULT_PRICING, calculateQuote, type PricingRule } from "@/lib/pricing";
+import { getPricingRule, pricingRuleRowToRule, savePricingRule } from "@/lib/queries";
 import { formatVND } from "@/lib/format";
 import { toast } from "sonner";
+import { useRequireRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/pricing")({
   head: () => ({ meta: [{ title: "Admin · Bảng giá" }] }),
@@ -23,14 +27,53 @@ const FIELDS: Array<{ key: keyof PricingRule; label: string; suffix?: string }> 
 ];
 
 function AdminPricing() {
+  useRequireRole("admin");
+  const queryClient = useQueryClient();
+  const { data: pricingRow, isLoading } = useQuery({
+    queryKey: ["pricing-rule"],
+    queryFn: getPricingRule,
+  });
   const [rule, setRule] = useState<PricingRule>(DEFAULT_PRICING);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (pricingRow) setRule(pricingRuleRowToRule(pricingRow));
+  }, [pricingRow]);
+
   const preview = calculateQuote({ distanceKm: 6.8, rule });
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await savePricingRule(rule);
+      toast.success("Đã lưu bảng giá mới");
+      queryClient.invalidateQueries({ queryKey: ["pricing-rule"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không lưu được bảng giá.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <AdminLayout title="Cài đặt bảng giá">
+        <div className="grid h-40 place-items-center text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout title="Cài đặt bảng giá">
       <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
         <div className="rounded-3xl bg-surface p-5">
-          <div className="mb-3 text-sm text-muted-foreground">Bảng giá đang áp dụng cho khu vực <span className="font-bold text-foreground">Cao Lãnh, Đồng Tháp</span>. Thay đổi chỉ ảnh hưởng đến chuyến đặt sau khi lưu.</div>
+          <div className="mb-3 text-sm text-muted-foreground">
+            Bảng giá đang áp dụng cho khu vực{" "}
+            <span className="font-bold text-foreground">Cao Lãnh, Đồng Tháp</span>. Thay đổi chỉ ảnh
+            hưởng đến chuyến đặt sau khi lưu.
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {FIELDS.map((f) => (
               <label key={f.key} className="block">
@@ -48,8 +91,20 @@ function AdminPricing() {
             ))}
           </div>
           <div className="mt-4 flex gap-2">
-            <button onClick={() => setRule(DEFAULT_PRICING)} className="rounded-xl border border-border px-4 py-2 text-sm font-bold">Đặt lại mặc định</button>
-            <button onClick={() => toast.success("Đã lưu bảng giá mới")} className="rounded-xl gradient-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-glow">Lưu thay đổi</button>
+            <button
+              onClick={() => setRule(DEFAULT_PRICING)}
+              className="rounded-xl border border-border px-4 py-2 text-sm font-bold"
+            >
+              Đặt lại mặc định
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex items-center gap-1.5 rounded-xl gradient-primary px-5 py-2 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-60"
+            >
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Lưu thay đổi
+            </button>
           </div>
         </div>
 
@@ -59,7 +114,9 @@ function AdminPricing() {
           <div className="mt-3 space-y-2 text-sm">
             <Row label="Phí mở cửa" value={preview.openingFee} />
             <Row label="Phí quãng đường" value={preview.distanceFee} />
-            {preview.nightSurcharge > 0 && <Row label="Phụ phí đêm" value={preview.nightSurcharge} />}
+            {preview.nightSurcharge > 0 && (
+              <Row label="Phụ phí đêm" value={preview.nightSurcharge} />
+            )}
             <div className="border-t border-border pt-2" />
             <div className="flex items-baseline justify-between">
               <span>Tổng dự kiến</span>
@@ -73,5 +130,10 @@ function AdminPricing() {
 }
 
 function Row({ label, value }: { label: string; value: number }) {
-  return <div className="flex justify-between"><span className="text-muted-foreground">{label}</span><span className="font-bold">{formatVND(value)}</span></div>;
+  return (
+    <div className="flex justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-bold">{formatVND(value)}</span>
+    </div>
+  );
 }

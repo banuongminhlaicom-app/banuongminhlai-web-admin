@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
+  Loader2,
   MessageSquare,
   Navigation,
   Phone,
@@ -10,7 +12,20 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MapPreview } from "@/components/MapPreview";
-import { driverStore, useDriver } from "@/lib/driver-store";
+import { useAuthState, useRequireRole } from "@/lib/auth";
+import {
+  completeDriverTrip,
+  getCustomerProfileForTrip,
+  getDriverSelf,
+  getTrip,
+  markDriverArrived,
+  setDriverStatus,
+  subscribeDriverSelf,
+  subscribeTripStatus,
+  updateTripStatus,
+  type DriverStatusDb,
+  type TripRow,
+} from "@/lib/queries";
 import { formatKm, formatMinutes, formatVND } from "@/lib/format";
 
 export const Route = createFileRoute("/driver/trips/$id")({
@@ -18,30 +33,67 @@ export const Route = createFileRoute("/driver/trips/$id")({
   component: DriverTripDetail,
 });
 
+function maskPhone(phone: string) {
+  if (phone.length < 6) return phone;
+  return `${phone.slice(0, phone.length - 4)}••${phone.slice(-2)}`;
+}
+
 function DriverTripDetail() {
+  useRequireRole("driver");
   const { id } = Route.useParams();
-  const s = useDriver();
+  const authState = useAuthState();
+  const driverId = authState.session?.user.id;
   const navigate = useNavigate();
-  const trip = s.currentTrip;
-  const [pinOpen, setPinOpen] = useState(false);
-  const [pin, setPin] = useState("");
+  const queryClient = useQueryClient();
+
+  const { data: trip, isLoading: tripLoading } = useQuery({
+    queryKey: ["trip", id],
+    queryFn: () => getTrip(id),
+    // Dự phòng cho lúc Realtime lỡ sự kiện (mất kết nối, subscribe trễ...).
+    refetchInterval: 4000,
+  });
+  const { data: driverSelf } = useQuery({
+    queryKey: ["driver-self", driverId],
+    queryFn: () => getDriverSelf(driverId!),
+    enabled: !!driverId,
+    refetchInterval: 4000,
+  });
+  const { data: customer } = useQuery({
+    queryKey: ["customer-profile", trip?.customer_id],
+    queryFn: () => getCustomerProfileForTrip(trip!.customer_id),
+    enabled: !!trip,
+  });
+
+  useEffect(
+    () => subscribeTripStatus(id, (updated) => queryClient.setQueryData(["trip", id], updated)),
+    [id, queryClient],
+  );
+  useEffect(() => {
+    if (!driverId) return;
+    return subscribeDriverSelf(driverId, (row) =>
+      queryClient.setQueryData(["driver-self", driverId], row),
+    );
+  }, [driverId, queryClient]);
+
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
 
   useEffect(() => {
-    if (!trip) navigate({ to: "/driver" });
-  }, [trip, navigate]);
+    if (!tripLoading && !trip) navigate({ to: "/driver" });
+  }, [tripLoading, trip, navigate]);
 
-  const elapsed = useElapsed(s.status === "in_progress" ? trip?.startedAt ?? null : null);
+  const driverStatus = driverSelf?.status;
+  const startedAtMs = trip?.started_at ? new Date(trip.started_at).getTime() : null;
+  const elapsed = useElapsed(driverStatus === "in_progress" ? startedAtMs : null);
 
   const cta = useMemo(() => {
-    switch (s.status) {
+    switch (driverStatus) {
       case "going_to_pickup":
         return { label: "Tôi đã đến điểm đón", next: "arrived" as const };
       case "arrived":
         return { label: "Xác nhận đã gặp khách", next: "met_customer" as const };
       case "met_customer":
-        return { label: "Nhập mã PIN để bắt đầu", next: "PIN" as const };
+        return { label: "Bắt đầu chuyến đi", next: "in_progress" as const };
       case "in_progress":
         return { label: "Hoàn thành chuyến đi", next: "SUMMARY" as const };
       case "assigned":
@@ -49,25 +101,40 @@ function DriverTripDetail() {
       default:
         return null;
     }
-  }, [s.status]);
+  }, [driverStatus]);
 
-  const handleCta = () => {
-    if (!cta) return;
-    if (cta.next === "PIN") {
-      setPinOpen(true);
-      return;
-    }
+  const handleCta = async () => {
+    if (!cta || !driverId || !trip) return;
     if (cta.next === "SUMMARY") {
       setSummaryOpen(true);
       return;
     }
-    driverStore.set({ status: cta.next });
-    toast.success(cta.label);
+    try {
+      if (cta.next === "arrived") {
+        await markDriverArrived(trip.id, driverId);
+      } else if (cta.next === "in_progress") {
+        await updateTripStatus(trip.id, "in_progress");
+        await setDriverStatus(driverId, "in_progress");
+      } else {
+        await setDriverStatus(driverId, cta.next as DriverStatusDb);
+      }
+      toast.success(cta.label);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Có lỗi xảy ra.");
+    }
   };
 
-  if (!trip) return null;
+  if (!trip || !driverSelf) {
+    return (
+      <div className="grid min-h-[100dvh] place-items-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const progress = ["going_to_pickup", "arrived", "met_customer", "in_progress"].indexOf(s.status);
+  const progress = ["going_to_pickup", "arrived", "met_customer", "in_progress"].indexOf(
+    driverStatus ?? "",
+  );
 
   return (
     <div className="mx-auto min-h-[100dvh] max-w-md bg-background pb-10">
@@ -87,18 +154,18 @@ function DriverTripDetail() {
         <div className="absolute inset-x-5 bottom-3 rounded-2xl bg-surface/95 px-3 py-2 text-xs backdrop-blur">
           <div className="flex items-center justify-between">
             <span className="font-bold">
-              {s.status === "in_progress"
+              {driverStatus === "in_progress"
                 ? "Đang đưa khách về điểm đến"
-                : s.status === "going_to_pickup"
+                : driverStatus === "going_to_pickup"
                   ? "Đang đến điểm đón khách"
-                  : s.status === "arrived"
+                  : driverStatus === "arrived"
                     ? "Đã tới điểm đón"
-                    : s.status === "met_customer"
+                    : driverStatus === "met_customer"
                       ? "Đã gặp khách — chờ PIN"
                       : "Chuẩn bị lên đường"}
             </span>
             <span className="text-muted-foreground">
-              ETA {formatMinutes(s.status === "in_progress" ? 12 : 4)}
+              ETA {formatMinutes(driverStatus === "in_progress" ? 12 : 4)}
             </span>
           </div>
         </div>
@@ -108,16 +175,16 @@ function DriverTripDetail() {
         <div className="rounded-3xl bg-surface p-4">
           <div className="flex items-center gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-background text-lg font-black text-primary">
-              {trip.customerName
+              {(customer?.full_name ?? "Khách hàng")
                 .split(" ")
                 .slice(-2)
                 .map((w) => w[0])
                 .join("")}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="font-bold">{trip.customerName}</div>
+              <div className="font-bold">{customer?.full_name ?? "Khách hàng"}</div>
               <div className="text-xs text-muted-foreground">
-                {trip.customerPhoneMasked}
+                {customer?.phone ? maskPhone(customer.phone) : "Chưa có số điện thoại"}
               </div>
             </div>
             <button
@@ -136,10 +203,8 @@ function DriverTripDetail() {
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-3 text-center text-[11px]">
-            <Cell label="Xe khách" value={trip.vehicleType} />
-            <Cell label="Hộp số" value={trip.transmission} />
-            <Cell label="Biển số" value={trip.plate} />
+          <div className="mt-3 border-t border-border/60 pt-3 text-center text-[11px]">
+            <Cell label="Xe khách" value={trip.vehicle_type} />
           </div>
         </div>
 
@@ -152,47 +217,41 @@ function DriverTripDetail() {
             </div>
             <div className="flex-1 space-y-3 text-xs">
               <div>
-                <div className="text-[10px] uppercase text-muted-foreground">
-                  Điểm đón
-                </div>
-                <div className="text-sm font-bold">{trip.pickup}</div>
-                <div className="text-muted-foreground">{trip.pickupAddress}</div>
+                <div className="text-[10px] uppercase text-muted-foreground">Điểm đón</div>
+                <div className="text-sm font-bold">{trip.pickup_address}</div>
               </div>
               <div>
                 <div className="text-[10px] uppercase text-muted-foreground">
-                  Điểm đến · {formatKm(trip.tripDistance)}
+                  Điểm đến · {trip.distance_km != null ? formatKm(trip.distance_km) : "—"}
                 </div>
-                <div className="text-sm font-bold">{trip.dropoff}</div>
-                <div className="text-muted-foreground">{trip.dropoffAddress}</div>
+                <div className="text-sm font-bold">{trip.dropoff_address}</div>
               </div>
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between rounded-2xl bg-background/60 p-3 text-xs">
-            <span className="text-muted-foreground">Ghi chú của khách</span>
-            <span className="ml-2 text-right font-semibold text-foreground">
-              {trip.note}
-            </span>
-          </div>
+          {trip.note && (
+            <div className="mt-3 flex items-center justify-between rounded-2xl bg-background/60 p-3 text-xs">
+              <span className="text-muted-foreground">Ghi chú của khách</span>
+              <span className="ml-2 text-right font-semibold text-foreground">{trip.note}</span>
+            </div>
+          )}
 
           <div className="mt-3 flex items-center justify-between rounded-2xl bg-primary/10 p-3">
             <span className="text-xs text-muted-foreground">Giá chuyến</span>
-            <span className="text-lg font-black text-primary">
-              {formatVND(trip.price)}
-            </span>
+            <span className="text-lg font-black text-primary">{formatVND(trip.price)}</span>
           </div>
         </div>
 
-        {s.status === "in_progress" && (
+        {driverStatus === "in_progress" && (
           <div className="grid grid-cols-2 gap-2 rounded-3xl bg-surface p-4 text-center text-xs">
             <div>
               <div className="text-muted-foreground">Đã đi</div>
               <div className="mt-1 text-lg font-black">{elapsed}</div>
             </div>
             <div>
-              <div className="text-muted-foreground">Còn lại</div>
+              <div className="text-muted-foreground">Quãng đường</div>
               <div className="mt-1 text-lg font-black">
-                {formatKm(Math.max(0, trip.tripDistance - 1.4))}
+                {trip.distance_km != null ? formatKm(trip.distance_km) : "—"}
               </div>
             </div>
           </div>
@@ -204,11 +263,7 @@ function DriverTripDetail() {
             Icon={Navigation}
             onClick={() => toast("Mở Google Maps chỉ đường")}
           />
-          <ActionBtn
-            label="Báo sự cố"
-            Icon={AlertTriangle}
-            onClick={() => setIssueOpen(true)}
-          />
+          <ActionBtn label="Báo sự cố" Icon={AlertTriangle} onClick={() => setIssueOpen(true)} />
           <ActionBtn
             label="Hỗ trợ"
             Icon={Phone}
@@ -216,7 +271,7 @@ function DriverTripDetail() {
           />
         </div>
 
-        {s.status !== "in_progress" && (
+        {driverStatus !== "in_progress" && (
           <div className="rounded-3xl bg-surface p-3">
             <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
               Tiến trình
@@ -248,43 +303,21 @@ function DriverTripDetail() {
         )}
       </div>
 
-      {pinOpen && (
-        <PinModal
-          value={pin}
-          onChange={setPin}
-          onClose={() => {
-            setPinOpen(false);
-            setPin("");
-          }}
-          onSubmit={() => {
-            if (pin !== trip.pin) {
-              toast.error("Mã xác nhận không chính xác.");
-              return;
-            }
-            driverStore.set({
-              status: "in_progress",
-              currentTrip: { ...trip, startedAt: Date.now() },
-            });
-            setPinOpen(false);
-            setPin("");
-            toast.success("PIN chính xác. Bắt đầu chuyến đi!");
-          }}
-        />
-      )}
-
-      {summaryOpen && (
+      {summaryOpen && driverId && (
         <SummarySheet
+          trip={trip}
+          driverTodayTrips={driverSelf.today_trips}
+          driverTodayRevenue={driverSelf.today_revenue}
           onClose={() => setSummaryOpen(false)}
-          onDone={(total) => {
-            driverStore.set({
-              status: "online",
-              currentTrip: null,
-              todayTrips: s.todayTrips + 1,
-              todayRevenue: s.todayRevenue + total,
-            });
-            setSummaryOpen(false);
-            toast.success("Đã hoàn thành chuyến đi!");
-            navigate({ to: "/driver" });
+          onDone={async (todayTrips, todayRevenue) => {
+            try {
+              await completeDriverTrip(driverId, trip.id, { todayTrips, todayRevenue });
+              setSummaryOpen(false);
+              toast.success("Đã hoàn thành chuyến đi!");
+              navigate({ to: "/driver" });
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Không hoàn thành được chuyến.");
+            }
           }}
         />
       )}
@@ -342,64 +375,19 @@ function Cell({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PinModal({
-  value,
-  onChange,
-  onClose,
-  onSubmit,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onClose: () => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-3xl bg-background p-5 shadow-elevated">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-black">Xác nhận mã PIN</h3>
-          <button
-            onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-full bg-surface"
-            aria-label="Đóng"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Yêu cầu khách đọc mã PIN 4 số hiển thị trên ứng dụng để bắt đầu chuyến.
-        </p>
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 4))}
-          inputMode="numeric"
-          autoFocus
-          className="mt-4 w-full rounded-2xl bg-surface px-4 py-4 text-center text-3xl font-black tracking-[0.6em] outline-none"
-          placeholder="••••"
-        />
-        <p className="mt-2 text-center text-[10px] text-muted-foreground">
-          Demo: 2684
-        </p>
-        <button
-          onClick={onSubmit}
-          disabled={value.length !== 4}
-          className="mt-4 w-full rounded-2xl gradient-primary py-3.5 text-sm font-black text-primary-foreground shadow-glow disabled:opacity-50"
-        >
-          Xác nhận & Bắt đầu chuyến
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function SummarySheet({
+  trip,
+  driverTodayTrips,
+  driverTodayRevenue,
   onClose,
   onDone,
 }: {
+  trip: TripRow;
+  driverTodayTrips: number;
+  driverTodayRevenue: number;
   onClose: () => void;
-  onDone: (total: number) => void;
+  onDone: (todayTrips: number, todayRevenue: number) => void;
 }) {
-  const trip = useDriver().currentTrip!;
   const surcharge = 15000;
   const total = trip.price + surcharge;
   const [method, setMethod] = useState<"cash" | "bank" | "qr">("cash");
@@ -420,19 +408,16 @@ function SummarySheet({
         </div>
 
         <div className="mt-3 space-y-1 rounded-2xl bg-surface p-3 text-xs">
-          <Row label="Điểm đón" value={trip.pickup} />
-          <Row label="Điểm đến" value={trip.dropoff} />
-          <Row label="Quãng đường" value={formatKm(trip.tripDistance)} />
-          <Row label="Thời gian chuyến" value={formatMinutes(24)} />
-          <Row label="Thời gian chờ" value={formatMinutes(5)} />
+          <Row label="Điểm đón" value={trip.pickup_address} />
+          <Row label="Điểm đến" value={trip.dropoff_address} />
+          <Row
+            label="Quãng đường"
+            value={trip.distance_km != null ? formatKm(trip.distance_km) : "—"}
+          />
           <div className="my-2 border-t border-border/60" />
           <Row label="Giá dự kiến" value={formatVND(trip.price)} />
           <Row label="Phụ phí chờ" value={formatVND(surcharge)} />
-          <Row
-            label="Tổng tiền"
-            value={formatVND(total)}
-            emphasize
-          />
+          <Row label="Tổng tiền" value={formatVND(total)} emphasize />
         </div>
 
         <div className="mt-3">
@@ -471,7 +456,7 @@ function SummarySheet({
         </label>
 
         <button
-          onClick={() => onDone(total)}
+          onClick={() => onDone(driverTodayTrips + 1, driverTodayRevenue + total)}
           disabled={!confirmed}
           className="mt-4 w-full rounded-2xl gradient-primary py-4 text-sm font-black uppercase text-primary-foreground shadow-glow disabled:opacity-50"
         >
@@ -525,20 +510,10 @@ function IssueSheet({
   );
 }
 
-function Row({
-  label,
-  value,
-  emphasize,
-}: {
-  label: string;
-  value: string;
-  emphasize?: boolean;
-}) {
+function Row({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className={emphasize ? "font-bold" : "text-muted-foreground"}>
-        {label}
-      </span>
+      <span className={emphasize ? "font-bold" : "text-muted-foreground"}>{label}</span>
       <span className={emphasize ? "text-base font-black text-primary" : "font-semibold"}>
         {value}
       </span>

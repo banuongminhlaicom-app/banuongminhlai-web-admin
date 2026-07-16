@@ -1,5 +1,14 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Car, DollarSign, Gauge, Headphones, LayoutGrid, Route as RouteIcon, Tag, Users } from "lucide-react";
+import {
+  Car,
+  DollarSign,
+  Gauge,
+  Headphones,
+  LayoutGrid,
+  Route as RouteIcon,
+  Tag,
+  Users,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { cn } from "@/lib/utils";
@@ -27,29 +36,43 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
             {NAV.map(({ to, label, Icon }) => {
               const active = to === "/admin" ? pathname === "/admin" : pathname.startsWith(to);
               return (
-                <Link key={to} to={to} className={cn(
-                  "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
-                  active ? "gradient-primary text-primary-foreground shadow-glow" : "text-muted-foreground hover:bg-background hover:text-foreground",
-                )}>
+                <Link
+                  key={to}
+                  to={to}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
+                    active
+                      ? "gradient-primary text-primary-foreground shadow-glow"
+                      : "text-muted-foreground hover:bg-background hover:text-foreground",
+                  )}
+                >
                   <Icon className="h-4 w-4" /> {label}
                 </Link>
               );
             })}
           </nav>
           <div className="mt-auto pt-4 text-[10px] text-muted-foreground">
-            <Link to="/home" className="hover:text-foreground">← Về khu khách hàng</Link>
+            <Link to="/home" className="hover:text-foreground">
+              ← Về khu khách hàng
+            </Link>
           </div>
         </aside>
 
         <main className="min-w-0">
           <header className="mb-4 flex items-center justify-between rounded-3xl bg-surface p-4">
             <div className="min-w-0">
-              <div className="text-[10px] uppercase text-muted-foreground">Admin · Bạn Uống Mình Lái</div>
+              <div className="text-[10px] uppercase text-muted-foreground">
+                Admin · Bạn Uống Mình Lái
+              </div>
               <h1 className="truncate text-xl font-black">{title}</h1>
             </div>
             <div className="hidden sm:flex items-center gap-2">
-              <div className="rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">● Hệ thống ổn định</div>
-              <div className="grid h-9 w-9 place-items-center rounded-full gradient-primary font-black text-primary-foreground">AD</div>
+              <div className="rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">
+                ● Hệ thống ổn định
+              </div>
+              <div className="grid h-9 w-9 place-items-center rounded-full gradient-primary font-black text-primary-foreground">
+                AD
+              </div>
             </div>
           </header>
 
@@ -58,8 +81,16 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
             {NAV.map(({ to, label, Icon }) => {
               const active = to === "/admin" ? pathname === "/admin" : pathname.startsWith(to);
               return (
-                <Link key={to} to={to} className={cn("shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold", active ? "gradient-primary text-primary-foreground" : "text-muted-foreground")}>
-                  <Icon className="h-3.5 w-3.5" />{label}
+                <Link
+                  key={to}
+                  to={to}
+                  className={cn(
+                    "shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold",
+                    active ? "gradient-primary text-primary-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
                 </Link>
               );
             })}

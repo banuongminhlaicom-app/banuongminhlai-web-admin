@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { DriverShell } from "@/components/DriverShell";
-import { useDriver } from "@/lib/driver-store";
+import { useAuthState, useRequireRole } from "@/lib/auth";
+import { getDriverSelf } from "@/lib/queries";
 import { formatVND } from "@/lib/format";
 
 export const Route = createFileRoute("/driver/earnings")({
@@ -9,6 +11,8 @@ export const Route = createFileRoute("/driver/earnings")({
   component: Earnings,
 });
 
+// Lịch sử giao dịch + doanh thu tuần/tháng vẫn là số liệu minh hoạ — báo cáo
+// thu nhập tổng hợp thật theo tài xế chưa nằm trong phạm vi hiện tại.
 const TX = [
   { code: "BUML-8821", amount: 127000, time: "20:15 hôm nay" },
   { code: "BUML-8798", amount: 245000, time: "23:10 hôm qua" },
@@ -18,9 +22,19 @@ const TX = [
 ];
 
 function Earnings() {
-  const s = useDriver();
-  const week = 4230000 + (s.todayRevenue - 890000);
-  const month = 18450000 + (s.todayRevenue - 890000);
+  useRequireRole("driver");
+  const authState = useAuthState();
+  const driverId = authState.session?.user.id;
+  const { data: driverSelf } = useQuery({
+    queryKey: ["driver-self", driverId],
+    queryFn: () => getDriverSelf(driverId!),
+    enabled: !!driverId,
+  });
+
+  const todayRevenue = driverSelf?.today_revenue ?? 0;
+  const todayTrips = driverSelf?.today_trips ?? 0;
+  const week = 4230000 + (todayRevenue - 890000);
+  const month = 18450000 + (todayRevenue - 890000);
   const fee = Math.round(month * 0.15);
   const net = month - fee;
 
@@ -34,14 +48,12 @@ function Earnings() {
       </div>
 
       <div className="mx-5 rounded-3xl gradient-primary p-5 text-primary-foreground shadow-glow">
-        <div className="text-xs font-semibold uppercase opacity-80">
-          Doanh thu tháng 07/2026
-        </div>
+        <div className="text-xs font-semibold uppercase opacity-80">Doanh thu tháng 07/2026</div>
         <div className="mt-2 text-3xl font-black">{formatVND(month)}</div>
         <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/20 pt-3 text-center text-xs">
           <div>
             <div className="opacity-80">Hôm nay</div>
-            <div className="font-bold">{formatVND(s.todayRevenue)}</div>
+            <div className="font-bold">{formatVND(todayRevenue)}</div>
           </div>
           <div>
             <div className="opacity-80">Tuần này</div>
@@ -57,7 +69,7 @@ function Earnings() {
       <div className="mx-5 mt-4 rounded-3xl bg-surface p-4 text-sm">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Tổng chuyến</span>
-          <span className="font-bold">{124 + (s.todayTrips - 7)}</span>
+          <span className="font-bold">{124 + (todayTrips - 7)}</span>
         </div>
         <div className="mt-1 flex justify-between">
           <span className="text-muted-foreground">Phí nền tảng (15%)</span>
@@ -80,9 +92,7 @@ function Earnings() {
               <div className="text-sm font-bold">{t.code}</div>
               <div className="text-xs text-muted-foreground">{t.time}</div>
             </div>
-            <div className="text-sm font-black text-success">
-              +{formatVND(t.amount)}
-            </div>
+            <div className="text-sm font-black text-success">+{formatVND(t.amount)}</div>
           </div>
         ))}
       </div>

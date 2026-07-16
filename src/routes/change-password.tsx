@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useRequireRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/change-password")({
   head: () => ({ meta: [{ title: "Đổi mật khẩu" }] }),
@@ -9,6 +10,7 @@ export const Route = createFileRoute("/change-password")({
 });
 
 function ChangePassword() {
+  useRequireRole("customer");
   const navigate = useNavigate();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -35,7 +37,10 @@ function ChangePassword() {
   return (
     <div className="mx-auto min-h-screen max-w-md bg-background pb-24">
       <div className="safe-top flex items-center gap-3 px-5 py-3">
-        <button onClick={() => history.back()} className="grid h-10 w-10 place-items-center rounded-full bg-surface">
+        <button
+          onClick={() => history.back()}
+          className="grid h-10 w-10 place-items-center rounded-full bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="text-lg font-black">Đổi mật khẩu</h1>
@@ -46,7 +51,8 @@ function ChangePassword() {
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div className="text-xs text-muted-foreground">
-          Vì an toàn tài khoản, đừng chia sẻ mật khẩu và nên dùng mật khẩu khác với các dịch vụ khác.
+          Vì an toàn tài khoản, đừng chia sẻ mật khẩu và nên dùng mật khẩu khác với các dịch vụ
+          khác.
         </div>
       </div>
 
@@ -55,7 +61,11 @@ function ChangePassword() {
         <Field label="Mật khẩu mới" value={next} onChange={setNext} show={show} />
         <Field label="Xác nhận mật khẩu mới" value={confirm} onChange={setConfirm} show={show} />
 
-        <button type="button" onClick={() => setShow((s) => !s)} className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => setShow((s) => !s)}
+          className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"
+        >
           {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           {show ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
         </button>
@@ -64,13 +74,18 @@ function ChangePassword() {
           <div className="rounded-2xl bg-surface p-3">
             <div className="mb-1.5 flex items-center justify-between text-[11px]">
               <span className="text-muted-foreground">Độ mạnh</span>
-              <span className={`font-bold ${strength >= 3 ? "text-success" : strength === 2 ? "text-warning" : "text-destructive"}`}>
+              <span
+                className={`font-bold ${strength >= 3 ? "text-success" : strength === 2 ? "text-warning" : "text-destructive"}`}
+              >
                 {STRENGTH_LABEL[strength]}
               </span>
             </div>
             <div className="flex gap-1">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className={`h-1.5 flex-1 rounded-full ${i < strength ? (strength >= 3 ? "bg-success" : strength === 2 ? "bg-warning" : "bg-destructive") : "bg-background"}`} />
+                <div
+                  key={i}
+                  className={`h-1.5 flex-1 rounded-full ${i < strength ? (strength >= 3 ? "bg-success" : strength === 2 ? "bg-warning" : "bg-destructive") : "bg-background"}`}
+                />
               ))}
             </div>
           </div>
@@ -89,7 +104,17 @@ function ChangePassword() {
   );
 }
 
-function Field({ label, value, onChange, show }: { label: string; value: string; onChange: (v: string) => void; show: boolean }) {
+function Field({
+  label,
+  value,
+  onChange,
+  show,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  show: boolean;
+}) {
   return (
     <label className="block">
       <div className="mb-1.5 text-xs font-semibold text-muted-foreground">{label}</div>

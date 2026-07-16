@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Banknote,
@@ -18,7 +19,15 @@ import {
   X,
 } from "lucide-react";
 import { MapPreview } from "@/components/MapPreview";
-import { VEHICLE_TYPES, SAVED_ADDRESSES } from "@/lib/mock";
+import { useAuthState, useRequireRole } from "@/lib/auth";
+import {
+  createTrip,
+  getAddresses,
+  getPricingRule,
+  getVehicleTypes,
+  findActivePromotionByCode,
+  pricingRuleRowToRule,
+} from "@/lib/queries";
 import { DEFAULT_PRICING } from "@/lib/pricing";
 import { formatKm, formatMinutes, formatVND } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -63,11 +72,25 @@ function roundTo1000(v: number) {
 }
 
 function Booking() {
+  useRequireRole("customer");
   const navigate = useNavigate();
+  const authState = useAuthState();
+  const userId = authState.session?.user.id;
+
+  const { data: vehicleTypes = [] } = useQuery({
+    queryKey: ["vehicle-types"],
+    queryFn: getVehicleTypes,
+  });
+  const { data: savedAddresses = [] } = useQuery({
+    queryKey: ["addresses", userId],
+    queryFn: () => getAddresses(userId!),
+    enabled: !!userId,
+  });
+  const { data: pricingRow } = useQuery({ queryKey: ["pricing-rule"], queryFn: getPricingRule });
 
   const [pickup, setPickup] = useState("Quán Bia Sài Gòn, Nguyễn Huệ, Cao Lãnh");
   const [destination, setDestination] = useState("Phường Mỹ Phú, Cao Lãnh");
-  const [vehicle, setVehicle] = useState(VEHICLE_TYPES[1].id);
+  const [vehicle, setVehicle] = useState("auto");
   const [when, setWhen] = useState<"now" | "later">("now");
   const [scheduled, setScheduled] = useState<{ date: string; time: string } | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -80,17 +103,22 @@ function Booking() {
   const [confirmed, setConfirmed] = useState(false);
 
   const [promo, setPromo] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
+  const [appliedPromo, setAppliedPromo] = useState<{
+    id: string;
+    code: string;
+    discount: number;
+  } | null>(null);
   const [promoError, setPromoError] = useState("");
+  const [promoChecking, setPromoChecking] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
 
   const distanceKm = 6.8;
   const duration = 18;
-  const rule = DEFAULT_PRICING;
+  const rule = pricingRow ? pricingRuleRowToRule(pricingRow) : DEFAULT_PRICING;
 
   const quote = useMemo(() => {
-    const multiplier = VEHICLE_TYPES.find((v) => v.id === vehicle)?.multiplier ?? 1;
+    const multiplier = vehicleTypes.find((v) => v.id === vehicle)?.multiplier ?? 1;
     const openingFee = rule.openingFee * multiplier;
     const firstBlock = rule.firstDistancePrice * multiplier;
     const extraKm = Math.max(0, distanceKm - rule.firstDistanceLimit);
@@ -99,7 +127,7 @@ function Booking() {
     const raw = openingFee + firstBlock + extraFee - discount;
     const total = roundTo1000(Math.max(raw, 0));
     return { multiplier, openingFee, firstBlock, extraKm, extraFee, discount, total };
-  }, [vehicle, appliedPromo, rule, distanceKm]);
+  }, [vehicle, appliedPromo, rule, distanceKm, vehicleTypes]);
 
   const isValid =
     pickup.trim() &&
@@ -110,19 +138,27 @@ function Booking() {
     confirmed &&
     (when === "now" || scheduled);
 
-  function applyPromo() {
+  async function applyPromo() {
     const code = promo.trim().toUpperCase();
     if (!code) {
       setPromoError("Vui lòng nhập mã ưu đãi");
       return;
     }
-    if (code === "TAIXE30") {
-      setAppliedPromo({ code, discount: 30000 });
-      setPromoError("");
-      toast.success("Đã áp dụng mã TAIXE30 (-30.000đ)");
-    } else {
-      setAppliedPromo(null);
-      setPromoError("Mã ưu đãi không hợp lệ hoặc đã hết hạn");
+    setPromoChecking(true);
+    try {
+      const found = await findActivePromotionByCode(code);
+      if (found) {
+        setAppliedPromo({ id: found.id, code: found.code, discount: found.discount });
+        setPromoError("");
+        toast.success(`Đã áp dụng mã ${found.code} (-${formatVND(found.discount)})`);
+      } else {
+        setAppliedPromo(null);
+        setPromoError("Mã ưu đãi không hợp lệ hoặc đã hết hạn");
+      }
+    } catch (err) {
+      setPromoError(err instanceof Error ? err.message : "Không kiểm tra được mã ưu đãi.");
+    } finally {
+      setPromoChecking(false);
     }
   }
 
@@ -132,18 +168,43 @@ function Booking() {
     setPromoError("");
   }
 
-  function handleSubmit() {
-    if (!isValid || submitting) return;
+  async function handleSubmit() {
+    if (!isValid || submitting || !userId) return;
     setSubmitting(true);
-    setTimeout(() => {
-      navigate({ to: "/booking/searching" });
-    }, 1000);
+    try {
+      const vehicleLabel = vehicleTypes.find((v) => v.id === vehicle)?.label ?? vehicle;
+      const trip = await createTrip({
+        customerId: userId,
+        pickupAddress: pickup.trim(),
+        dropoffAddress: destination.trim(),
+        distanceKm,
+        durationMin: duration,
+        vehicleType: vehicleLabel,
+        paymentMethod: payment,
+        price: quote.total,
+        promotionId: appliedPromo?.id ?? null,
+        note: note.trim() || null,
+      });
+      // Dùng điều hướng cứng thay vì navigate() của router: ở một số trường
+      // hợp router không hoàn tất chuyển route dù URL đã đổi (component mới
+      // không được render). window.location.href buộc tải lại trang thật từ
+      // server, đảm bảo luôn vào đúng màn hình.
+      window.location.href = `/booking/searching?tripId=${trip.id}`;
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Không tạo được chuyến đi. Vui lòng thử lại.",
+      );
+      setSubmitting(false);
+    }
   }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background pb-32">
       <div className="safe-top sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background px-5 py-3">
-        <button onClick={() => history.back()} className="grid h-10 w-10 place-items-center rounded-full bg-surface">
+        <button
+          onClick={() => history.back()}
+          className="grid h-10 w-10 place-items-center rounded-full bg-surface"
+        >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="text-base font-semibold">Đặt tài xế</h1>
@@ -176,7 +237,7 @@ function Booking() {
             </div>
           </div>
           <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
-            {SAVED_ADDRESSES.map((a) => (
+            {savedAddresses.map((a) => (
               <button
                 key={a.id}
                 onClick={() => setDestination(a.address)}
@@ -215,7 +276,7 @@ function Booking() {
         {/* Vehicle types */}
         <h3 className="mb-2 mt-5 text-sm font-semibold">Chọn phương tiện của bạn</h3>
         <div className="grid grid-cols-2 gap-2">
-          {VEHICLE_TYPES.map((v) => (
+          {vehicleTypes.map((v) => (
             <button
               key={v.id}
               onClick={() => setVehicle(v.id)}
@@ -227,7 +288,7 @@ function Booking() {
               <span className="text-2xl">{v.icon}</span>
               <div className="min-w-0">
                 <div className="text-sm font-semibold">{v.label}</div>
-                <div className="truncate text-[11px] text-muted-foreground">{v.desc}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{v.description}</div>
               </div>
             </button>
           ))}
@@ -272,7 +333,9 @@ function Booking() {
             }}
             className={cn(
               "rounded-2xl py-3 text-sm font-semibold",
-              when === "now" ? "gradient-primary text-primary-foreground shadow-glow" : "bg-surface text-muted-foreground",
+              when === "now"
+                ? "gradient-primary text-primary-foreground shadow-glow"
+                : "bg-surface text-muted-foreground",
             )}
           >
             Đặt ngay
@@ -284,7 +347,9 @@ function Booking() {
             }}
             className={cn(
               "rounded-2xl py-3 text-sm font-semibold",
-              when === "later" ? "gradient-primary text-primary-foreground shadow-glow" : "bg-surface text-muted-foreground",
+              when === "later"
+                ? "gradient-primary text-primary-foreground shadow-glow"
+                : "bg-surface text-muted-foreground",
             )}
           >
             Đặt lịch trước
@@ -313,7 +378,9 @@ function Booking() {
                 onClick={() => setPayment(m.id)}
                 className={cn(
                   "flex flex-col items-center gap-1 rounded-2xl border p-3 text-[12px] font-semibold transition",
-                  active ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface text-muted-foreground",
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-surface text-muted-foreground",
                 )}
               >
                 <Icon className="h-5 w-5" />
@@ -356,8 +423,10 @@ function Booking() {
           ) : (
             <button
               onClick={applyPromo}
-              className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+              disabled={promoChecking}
+              className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
             >
+              {promoChecking && <Loader2 className="h-3 w-3 animate-spin" />}
               Áp dụng
             </button>
           )}
@@ -371,7 +440,9 @@ function Booking() {
 
         {/* Quote breakdown */}
         <div className="mt-5 rounded-3xl bg-surface p-4">
-          <div className="mb-3 text-[12px] font-semibold uppercase text-muted-foreground">Chi tiết báo giá</div>
+          <div className="mb-3 text-[12px] font-semibold uppercase text-muted-foreground">
+            Chi tiết báo giá
+          </div>
           <QuoteRow label="Phí mở cửa" value={quote.openingFee} />
           <QuoteRow label={`${rule.firstDistanceLimit} km đầu`} value={quote.firstBlock} />
           {quote.extraKm > 0 && (
@@ -380,14 +451,17 @@ function Booking() {
               value={quote.extraFee}
             />
           )}
-          {quote.discount > 0 && <QuoteRow label={`Mã ưu đãi ${appliedPromo?.code}`} value={-quote.discount} />}
+          {quote.discount > 0 && (
+            <QuoteRow label={`Mã ưu đãi ${appliedPromo?.code}`} value={-quote.discount} />
+          )}
           <div className="my-2 border-t border-dashed border-border" />
           <div className="flex items-baseline justify-between">
             <span className="text-sm font-semibold">Tổng dự kiến</span>
             <span className="text-2xl font-black text-primary">{formatVND(quote.total)}</span>
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            * Đã làm tròn đến 1.000đ. Giá thực tế có thể thay đổi nếu phát sinh quãng đường hoặc thời gian chờ.
+            * Đã làm tròn đến 1.000đ. Giá thực tế có thể thay đổi nếu phát sinh quãng đường hoặc
+            thời gian chờ.
           </p>
         </div>
 
@@ -399,7 +473,8 @@ function Booking() {
             className="mt-0.5 shrink-0"
           />
           <span className="text-[13px] leading-snug">
-            Tôi xác nhận tài xế sẽ sử dụng chính phương tiện của tôi để đưa tôi và phương tiện về điểm đến.
+            Tôi xác nhận tài xế sẽ sử dụng chính phương tiện của tôi để đưa tôi và phương tiện về
+            điểm đến.
           </span>
         </label>
       </div>
@@ -421,9 +496,7 @@ function Booking() {
               <Loader2 className="h-5 w-5 animate-spin" /> Đang xử lý…
             </>
           ) : (
-            <>
-              ĐẶT TÀI XẾ NGAY · {formatVND(quote.total)}
-            </>
+            <>ĐẶT TÀI XẾ NGAY · {formatVND(quote.total)}</>
           )}
         </button>
         {!confirmed && (
@@ -507,7 +580,11 @@ function ScheduleSheet({
       return;
     }
     setError("");
-    const label = chosen.toLocaleDateString("vi-VN", { weekday: "short", day: "2-digit", month: "2-digit" });
+    const label = chosen.toLocaleDateString("vi-VN", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+    });
     onConfirm(label, time);
   }
 
@@ -520,14 +597,27 @@ function ScheduleSheet({
         <div className="mt-4 space-y-3">
           <div>
             <Label className="text-xs">Chọn ngày</Label>
-            <Input type="date" min={defaultDate} value={date} onChange={(e) => setDate(e.target.value)} className="mt-1" />
+            <Input
+              type="date"
+              min={defaultDate}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="mt-1"
+            />
           </div>
           <div>
             <Label className="text-xs">Chọn giờ</Label>
-            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="mt-1" />
+            <Input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="mt-1"
+            />
           </div>
           {error && <p className="text-[12px] text-primary">{error}</p>}
-          <p className="text-[11px] text-muted-foreground">Thời gian đặt phải muộn hơn hiện tại ít nhất 30 phút.</p>
+          <p className="text-[11px] text-muted-foreground">
+            Thời gian đặt phải muộn hơn hiện tại ít nhất 30 phút.
+          </p>
           <button
             onClick={confirm}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3 text-sm font-bold text-primary-foreground shadow-glow"
@@ -575,11 +665,21 @@ function VehicleSheet({
         <div className="mt-4 space-y-3">
           <div>
             <Label className="text-xs">Tên xe</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="VD: Toyota Vios 2022" className="mt-1" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="VD: Toyota Vios 2022"
+              className="mt-1"
+            />
           </div>
           <div>
             <Label className="text-xs">Biển số</Label>
-            <Input value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} placeholder="VD: 66A-123.45" className="mt-1" />
+            <Input
+              value={plate}
+              onChange={(e) => setPlate(e.target.value.toUpperCase())}
+              placeholder="VD: 66A-123.45"
+              className="mt-1"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

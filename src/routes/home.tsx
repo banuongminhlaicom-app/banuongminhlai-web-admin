@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Bell, MapPin, Search, ShieldAlert, Zap, CalendarClock, Loader2 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { MapPreview } from "@/components/MapPreview";
 import { EmergencyButton } from "@/components/EmergencyButton";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { SAVED_ADDRESSES } from "@/lib/mock";
+import { useAuthState, useRequireRole } from "@/lib/auth";
+import { getAddresses } from "@/lib/queries";
 
 export const Route = createFileRoute("/home")({
   head: () => ({ meta: [{ title: "Trang chủ — Bạn Uống Mình Lái" }] }),
@@ -14,8 +16,16 @@ export const Route = createFileRoute("/home")({
 });
 
 function HomeScreen() {
+  useRequireRole("customer");
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const authState = useAuthState();
+  const userId = authState.session?.user.id;
+  const { data: savedAddresses = [] } = useQuery({
+    queryKey: ["addresses", userId],
+    queryFn: () => getAddresses(userId!),
+    enabled: !!userId,
+  });
 
   const goBook = (to: "/booking" | "/schedule") => {
     if (to === "/booking") setLoading(true);
@@ -76,7 +86,9 @@ function HomeScreen() {
               <Search className="h-4 w-4 text-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Điểm đón</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Điểm đón
+              </div>
               <div className="truncate text-[14px] font-semibold">Tài xế sẽ đến đón bạn ở đâu?</div>
             </div>
           </button>
@@ -91,8 +103,12 @@ function HomeScreen() {
               <MapPin className="h-4 w-4 text-success" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Điểm đến</div>
-              <div className="truncate text-[14px] font-semibold text-muted-foreground">Bạn muốn về đâu?</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                Điểm đến
+              </div>
+              <div className="truncate text-[14px] font-semibold text-muted-foreground">
+                Bạn muốn về đâu?
+              </div>
             </div>
           </button>
 
@@ -133,23 +149,32 @@ function HomeScreen() {
             Xem tất cả
           </button>
         </div>
-        <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-4 px-4 pb-1 no-scrollbar">
-          {SAVED_ADDRESSES.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => goBook("/booking")}
-              className="flex w-[220px] shrink-0 snap-start items-start gap-2.5 rounded-2xl bg-surface p-3 text-left shadow-elevated ring-1 ring-border"
-            >
-              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-background text-lg">
-                {a.icon}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[14px] font-semibold">{a.label}</div>
-                <div className="truncate text-[12px] text-muted-foreground">{a.address}</div>
-              </div>
-            </button>
-          ))}
-        </div>
+        {savedAddresses.length === 0 ? (
+          <button
+            onClick={() => navigate({ to: "/addresses" })}
+            className="w-full rounded-2xl border border-dashed border-border bg-surface/60 p-4 text-left text-[13px] text-muted-foreground"
+          >
+            Chưa có địa chỉ đã lưu. Bấm để thêm địa chỉ đầu tiên.
+          </button>
+        ) : (
+          <div className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-4 px-4 pb-1 no-scrollbar">
+            {savedAddresses.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => goBook("/booking")}
+                className="flex w-[220px] shrink-0 snap-start items-start gap-2.5 rounded-2xl bg-surface p-3 text-left shadow-elevated ring-1 ring-border"
+              >
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-background text-lg">
+                  {a.icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[14px] font-semibold">{a.label}</div>
+                  <div className="truncate text-[12px] text-muted-foreground">{a.address}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Safety banner */}
@@ -160,7 +185,9 @@ function HomeScreen() {
           </div>
           <div className="min-w-0">
             <div className="text-[14px] font-bold leading-tight">Đã uống — Đừng lái</div>
-            <div className="text-[12px] text-muted-foreground">Bạn cứ vui, việc lái xe để chúng tôi lo.</div>
+            <div className="text-[12px] text-muted-foreground">
+              Bạn cứ vui, việc lái xe để chúng tôi lo.
+            </div>
           </div>
         </div>
       </section>

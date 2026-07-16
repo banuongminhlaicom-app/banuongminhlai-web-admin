@@ -1,42 +1,99 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Phone, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
-import { driverStore } from "@/lib/driver-store";
+import { GoogleIcon } from "@/components/GoogleIcon";
+import {
+  ensureProfile,
+  sendPhoneOtp,
+  signInWithGoogle,
+  signOutAuth,
+  useAuthState,
+  verifyPhoneOtp,
+} from "@/lib/auth";
 
 export const Route = createFileRoute("/driver/login")({
   head: () => ({ meta: [{ title: "Đăng nhập tài xế" }] }),
   component: DriverLogin,
 });
 
+function toE164(localPhone: string) {
+  const digits = localPhone.replace(/\D/g, "").replace(/^0+/, "");
+  return `+84${digits}`;
+}
+
 function DriverLogin() {
   const [phone, setPhone] = useState("0901234567");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
+  const authState = useAuthState();
 
-  const sendOtp = () => {
+  // Xử lý khi quay lại từ Google OAuth (hoặc đã có sẵn phiên đăng nhập driver).
+  useEffect(() => {
+    if (authState.status !== "signed_in" || !authState.session) return;
+    if (authState.profile) {
+      if (authState.profile.role === "driver") {
+        navigate({ to: "/driver" });
+      } else {
+        toast.error(
+          "Tài khoản Google này đã đăng ký với vai trò khác. Vui lòng dùng tài khoản khác cho tài xế.",
+        );
+        signOutAuth();
+      }
+      return;
+    }
+    ensureProfile(authState.session.user.id, "driver", authState.session.user.phone || null)
+      .then(() => navigate({ to: "/driver" }))
+      .catch((err) => toast.error(err instanceof Error ? err.message : "Không tạo được hồ sơ."));
+  }, [authState, navigate]);
+
+  const sendOtp = async () => {
     if (phone.replace(/\D/g, "").length < 9) {
       toast.error("Số điện thoại không hợp lệ");
       return;
     }
-    setOtpSent(true);
-    toast.success("Mã OTP demo: 123456");
+    setSending(true);
+    try {
+      await sendPhoneOtp(toE164(phone));
+      setOtpSent(true);
+      toast.success("Đã gửi mã OTP");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không gửi được OTP. Vui lòng thử lại.");
+    } finally {
+      setSending(false);
+    }
   };
 
-  const submit = () => {
-    if (otp !== "123456") {
-      toast.error("Mã OTP không đúng. Dùng 123456 để demo.");
+  const submit = async () => {
+    if (otp.length !== 6) {
+      toast.error("Vui lòng nhập đủ 6 số OTP");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      driverStore.set({ authed: true });
+    try {
+      await verifyPhoneOtp(toE164(phone), otp, "driver");
       toast.success("Đăng nhập thành công");
       navigate({ to: "/driver" });
-    }, 700);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Mã OTP không đúng.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle("/driver/login");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không đăng nhập được với Google.");
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -45,9 +102,7 @@ function DriverLogin() {
         <BrandLogo />
         <div className="text-center">
           <div className="text-lg font-black">Cổng tài xế</div>
-          <div className="text-xs text-muted-foreground">
-            Bạn Uống Mình Lái · Cao Lãnh
-          </div>
+          <div className="text-xs text-muted-foreground">Bạn Uống Mình Lái · Cao Lãnh</div>
         </div>
       </div>
 
@@ -55,17 +110,33 @@ function DriverLogin() {
         <ShieldCheck className="h-5 w-5 text-success" />
         <div className="text-xs">
           <div className="font-bold text-success">Hồ sơ đã được phê duyệt</div>
-          <div className="text-muted-foreground">
-            Trần Minh Tuấn · Bằng B2 · 328 chuyến
-          </div>
+          <div className="text-muted-foreground">Trần Minh Tuấn · Bằng B2 · 328 chuyến</div>
         </div>
       </div>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6">
+        <button
+          onClick={handleGoogle}
+          disabled={googleLoading}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3.5 text-sm font-bold active:scale-[.98] transition disabled:opacity-60"
+        >
+          {googleLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <GoogleIcon className="h-4 w-4" />
+          )}
+          Đăng nhập với Google
+        </button>
+        <div className="my-4 flex items-center gap-3 text-[11px] text-muted-foreground">
+          <div className="h-px flex-1 bg-border" />
+          hoặc dùng số điện thoại
+          <div className="h-px flex-1 bg-border" />
+        </div>
+      </div>
+
+      <div className="space-y-3">
         <label className="block">
-          <span className="text-xs font-semibold text-muted-foreground">
-            Số điện thoại
-          </span>
+          <span className="text-xs font-semibold text-muted-foreground">Số điện thoại</span>
           <div className="mt-1 flex items-center gap-2 rounded-2xl bg-surface px-4 py-3">
             <Phone className="h-4 w-4 text-muted-foreground" />
             <input
@@ -80,9 +151,7 @@ function DriverLogin() {
 
         {otpSent && (
           <label className="block">
-            <span className="text-xs font-semibold text-muted-foreground">
-              Mã OTP (demo: 123456)
-            </span>
+            <span className="text-xs font-semibold text-muted-foreground">Mã OTP</span>
             <input
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
@@ -96,8 +165,10 @@ function DriverLogin() {
         {!otpSent ? (
           <button
             onClick={sendOtp}
-            className="w-full rounded-2xl gradient-primary py-3.5 text-sm font-bold text-primary-foreground shadow-glow"
+            disabled={sending}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3.5 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-60"
           >
+            {sending && <Loader2 className="h-4 w-4 animate-spin" />}
             Gửi mã OTP
           </button>
         ) : (

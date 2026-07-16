@@ -22,7 +22,7 @@ export function MapPreview({
   zoom?: number;
 }) {
   const src = `https://maps.google.com/maps?q=${encodeURIComponent(
-    query
+    query,
   )}&z=${zoom}&hl=vi&output=embed`;
 
   return (
@@ -79,7 +79,9 @@ export function MapPreview({
 
 function DriverDot({ className }: { className?: string }) {
   return (
-    <div className={cn("pointer-events-none absolute -translate-x-1/2 -translate-y-1/2", className)}>
+    <div
+      className={cn("pointer-events-none absolute -translate-x-1/2 -translate-y-1/2", className)}
+    >
       <div className="grid h-7 w-7 place-items-center rounded-full bg-foreground text-background text-sm shadow-elevated ring-2 ring-background/70">
         🚗
       </div>

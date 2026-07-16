@@ -1,8 +1,22 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Award, Car, ChevronRight, CreditCard, Headphones, KeyRound, LogOut, MapPin, Shield, Star, User, Wallet } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  Award,
+  Car,
+  ChevronRight,
+  CreditCard,
+  Headphones,
+  KeyRound,
+  LogOut,
+  MapPin,
+  Shield,
+  Star,
+  User,
+  Wallet,
+} from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
+import { signOutAuth, useRequireRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({ meta: [{ title: "Tài khoản" }] }),
@@ -21,12 +35,23 @@ const ITEMS = [
 ] as const;
 
 function Profile() {
+  useRequireRole("customer");
+  const navigate = useNavigate();
+
+  const logout = async () => {
+    await signOutAuth();
+    toast("Đã đăng xuất");
+    navigate({ to: "/login" });
+  };
+
   return (
     <MobileShell>
       <div className="safe-top px-5 pt-3">
         <div className="rounded-3xl bg-surface p-5 shadow-elevated">
           <div className="flex items-center gap-3">
-            <div className="grid h-16 w-16 place-items-center rounded-2xl gradient-primary text-xl font-black text-primary-foreground shadow-glow">NA</div>
+            <div className="grid h-16 w-16 place-items-center rounded-2xl gradient-primary text-xl font-black text-primary-foreground shadow-glow">
+              NA
+            </div>
             <div className="min-w-0 flex-1">
               <div className="text-lg font-black">Nguyễn Văn An</div>
               <div className="text-xs text-muted-foreground">+84 901 234 567</div>
@@ -55,8 +80,14 @@ function Profile() {
         <div className="overflow-hidden rounded-3xl bg-surface">
           <ThemeToggle variant="row" className="border-b border-border/60" />
           {ITEMS.map(({ label, Icon, to }) => (
-            <Link key={label} to={to} className="flex items-center gap-3 border-b border-border/60 p-4 last:border-b-0 active:bg-background/30">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-background text-primary"><Icon className="h-4 w-4" /></div>
+            <Link
+              key={label}
+              to={to}
+              className="flex items-center gap-3 border-b border-border/60 p-4 last:border-b-0 active:bg-background/30"
+            >
+              <div className="grid h-9 w-9 place-items-center rounded-xl bg-background text-primary">
+                <Icon className="h-4 w-4" />
+              </div>
               <div className="flex-1 text-sm font-semibold">{label}</div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Link>
@@ -65,28 +96,43 @@ function Profile() {
       </div>
 
       <div className="mt-4 px-5">
-        <Link to="/driver" className="flex items-center gap-3 rounded-3xl border border-primary/30 bg-primary/10 p-4">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl gradient-primary text-xl">🚗</div>
+        <Link
+          to="/driver"
+          className="flex items-center gap-3 rounded-3xl border border-primary/30 bg-primary/10 p-4"
+        >
+          <div className="grid h-11 w-11 place-items-center rounded-2xl gradient-primary text-xl">
+            🚗
+          </div>
           <div className="flex-1">
             <div className="text-sm font-bold">Trở thành tài xế</div>
-            <div className="text-xs text-muted-foreground">Kiếm thêm thu nhập cùng Bạn Uống Mình Lái</div>
+            <div className="text-xs text-muted-foreground">
+              Kiếm thêm thu nhập cùng Bạn Uống Mình Lái
+            </div>
           </div>
           <ChevronRight className="h-4 w-4 text-primary" />
         </Link>
       </div>
 
       <div className="mt-4 px-5">
-        <Link to="/admin" className="block rounded-2xl bg-surface p-3 text-center text-xs font-semibold text-muted-foreground">
+        <Link
+          to="/admin"
+          className="block rounded-2xl bg-surface p-3 text-center text-xs font-semibold text-muted-foreground"
+        >
           Vào khu vực quản trị viên →
         </Link>
       </div>
 
       <div className="mt-4 px-5">
-        <button onClick={() => toast("Đã đăng xuất (demo)")} className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-bold text-destructive">
+        <button
+          onClick={logout}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border py-3 text-sm font-bold text-destructive"
+        >
           <LogOut className="h-4 w-4" /> Đăng xuất
         </button>
       </div>
-      <div className="mt-3 px-5 text-center text-[10px] text-muted-foreground">Phiên bản 0.1.0 · Cao Lãnh, Đồng Tháp</div>
+      <div className="mt-3 px-5 text-center text-[10px] text-muted-foreground">
+        Phiên bản 0.1.0 · Cao Lãnh, Đồng Tháp
+      </div>
     </MobileShell>
   );
 }

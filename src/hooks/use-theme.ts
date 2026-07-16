@@ -20,7 +20,9 @@ export function useTheme() {
       const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
       if (saved === "light" || saved === "dark") initial = saved;
       else if (window.matchMedia?.("(prefers-color-scheme: light)").matches) initial = "light";
-    } catch {}
+    } catch {
+      // localStorage có thể bị chặn (Safari private mode) — bỏ qua, dùng theme mặc định.
+    }
     setThemeState(initial);
     applyTheme(initial);
   }, []);
@@ -28,14 +30,22 @@ export function useTheme() {
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);
     applyTheme(next);
-    try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // localStorage có thể bị chặn (Safari private mode) — bỏ qua, dùng theme mặc định.
+    }
   }, []);
 
   const toggle = useCallback(() => {
     setThemeState((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
       applyTheme(next);
-      try { localStorage.setItem(STORAGE_KEY, next); } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, next);
+      } catch {
+        // localStorage có thể bị chặn (Safari private mode) — bỏ qua, dùng theme mặc định.
+      }
       return next;
     });
   }, []);

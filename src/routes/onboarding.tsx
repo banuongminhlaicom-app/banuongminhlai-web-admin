@@ -8,9 +8,21 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 const SLIDES = [
-  { Icon: Beer, title: "Tận hưởng cuộc vui an toàn", desc: "Cứ vui trọn vẹn cùng bạn bè. Việc lái xe hãy để chúng tôi lo." },
-  { Icon: Car, title: "Tài xế đến tận nơi", desc: "Tài xế chuyên nghiệp sẽ tới đón bạn chỉ trong vài phút." },
-  { Icon: Home, title: "Đưa bạn và xe về nhà", desc: "Tài xế lái chính xe của bạn, đưa cả người và xe về an toàn." },
+  {
+    Icon: Beer,
+    title: "Tận hưởng cuộc vui an toàn",
+    desc: "Cứ vui trọn vẹn cùng bạn bè. Việc lái xe hãy để chúng tôi lo.",
+  },
+  {
+    Icon: Car,
+    title: "Tài xế đến tận nơi",
+    desc: "Tài xế chuyên nghiệp sẽ tới đón bạn chỉ trong vài phút.",
+  },
+  {
+    Icon: Home,
+    title: "Đưa bạn và xe về nhà",
+    desc: "Tài xế lái chính xe của bạn, đưa cả người và xe về an toàn.",
+  },
 ];
 
 function Onboarding() {
@@ -22,7 +34,9 @@ function Onboarding() {
     <div className="mx-auto flex min-h-screen max-w-md flex-col bg-background px-6 pb-10 pt-8 gradient-hero">
       <div className="flex items-center justify-between">
         <BrandLogo size="sm" />
-        <Link to="/login" className="text-sm text-muted-foreground">Bỏ qua</Link>
+        <Link to="/login" className="text-sm text-muted-foreground">
+          Bỏ qua
+        </Link>
       </div>
 
       <div className="my-10 flex flex-1 flex-col items-center justify-center gap-8 text-center">
@@ -35,7 +49,10 @@ function Onboarding() {
         </div>
         <div className="flex gap-2">
           {SLIDES.map((_, idx) => (
-            <div key={idx} className={`h-1.5 rounded-full transition-all ${idx === i ? "w-8 bg-primary" : "w-2 bg-muted"}`} />
+            <div
+              key={idx}
+              className={`h-1.5 rounded-full transition-all ${idx === i ? "w-8 bg-primary" : "w-2 bg-muted"}`}
+            />
           ))}
         </div>
       </div>

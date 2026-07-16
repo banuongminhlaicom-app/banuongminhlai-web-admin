@@ -18,7 +18,12 @@ function Support() {
   return (
     <div className="mx-auto min-h-screen max-w-md bg-background pb-10">
       <div className="safe-top flex items-center gap-3 px-5 py-3">
-        <button onClick={() => history.back()} className="grid h-10 w-10 place-items-center rounded-full bg-surface"><ArrowLeft className="h-5 w-5" /></button>
+        <button
+          onClick={() => history.back()}
+          className="grid h-10 w-10 place-items-center rounded-full bg-surface"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
         <h1 className="text-lg font-black">Trung tâm hỗ trợ</h1>
       </div>
 
@@ -32,7 +37,10 @@ function Support() {
       <h3 className="mb-2 mt-6 px-5 text-sm font-bold">Câu hỏi thường gặp</h3>
       <div className="mx-5 divide-y divide-border/60 overflow-hidden rounded-2xl bg-surface">
         {FAQ.map((q) => (
-          <button key={q} className="flex w-full items-center justify-between p-4 text-left text-sm font-semibold active:bg-background/30">
+          <button
+            key={q}
+            className="flex w-full items-center justify-between p-4 text-left text-sm font-semibold active:bg-background/30"
+          >
             {q}
             <span className="text-muted-foreground">›</span>
           </button>
@@ -40,18 +48,40 @@ function Support() {
       </div>
 
       <div className="mt-4 px-5 text-center text-xs text-muted-foreground">
-        <Link to="/terms" className="underline">Điều khoản sử dụng</Link> · <Link to="/privacy" className="underline">Chính sách bảo mật</Link>
+        <Link to="/terms" className="underline">
+          Điều khoản sử dụng
+        </Link>{" "}
+        ·{" "}
+        <Link to="/privacy" className="underline">
+          Chính sách bảo mật
+        </Link>
       </div>
     </div>
   );
 }
 
-function ActionCard({ Icon, label, desc, tone }: { Icon: typeof Phone; label: string; desc: string; tone?: "primary" }) {
+function ActionCard({
+  Icon,
+  label,
+  desc,
+  tone,
+}: {
+  Icon: typeof Phone;
+  label: string;
+  desc: string;
+  tone?: "primary";
+}) {
   return (
-    <button className={`rounded-2xl p-4 text-left ${tone === "primary" ? "gradient-primary text-primary-foreground shadow-glow" : "bg-surface"}`}>
+    <button
+      className={`rounded-2xl p-4 text-left ${tone === "primary" ? "gradient-primary text-primary-foreground shadow-glow" : "bg-surface"}`}
+    >
       <Icon className="h-6 w-6" />
       <div className="mt-2 text-sm font-bold">{label}</div>
-      <div className={`text-xs ${tone === "primary" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{desc}</div>
+      <div
+        className={`text-xs ${tone === "primary" ? "text-primary-foreground/80" : "text-muted-foreground"}`}
+      >
+        {desc}
+      </div>
     </button>
   );
 }

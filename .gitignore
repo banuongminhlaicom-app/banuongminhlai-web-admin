@@ -20,10 +20,20 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Env
+.env
+
+# Supabase local dev
+supabase/.branches
+supabase/.temp
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# Claude Code local settings (per-machine, không chia sẻ qua repo)
+.claude/settings.local.json
 .DS_Store
 *.suo
 *.ntvs*

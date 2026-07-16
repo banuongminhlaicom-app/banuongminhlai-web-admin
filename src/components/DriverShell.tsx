@@ -38,18 +38,14 @@ function DriverNav({ pathname }: { pathname: string }) {
       <div className="mx-3 mb-2 rounded-3xl border border-border bg-surface/95 px-2 py-2 backdrop-blur-xl shadow-elevated">
         <ul className="grid grid-cols-4">
           {TABS.map(({ to, label, Icon }) => {
-            const active =
-              pathname === to ||
-              (to !== "/driver" && pathname.startsWith(to));
+            const active = pathname === to || (to !== "/driver" && pathname.startsWith(to));
             return (
               <li key={to}>
                 <Link
                   to={to}
                   className={cn(
                     "flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[10px] font-medium transition-colors",
-                    active
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground",
+                    active ? "text-primary" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Icon className={cn("h-5 w-5", active && "scale-110")} />
