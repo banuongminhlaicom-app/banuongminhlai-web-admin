@@ -21,6 +21,7 @@ import {
 import { MapPreview } from "@/components/MapPreview";
 import { useAuthState, useRequireRole } from "@/lib/auth";
 import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/google-maps";
+import { fetchPlaceSuggestions, type PlaceSuggestion } from "@/lib/places";
 import {
   createTrip,
   getAddresses,
@@ -98,12 +99,8 @@ function Booking() {
   const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(
     null,
   );
-  const [pickupSuggestions, setPickupSuggestions] = useState<google.maps.places.PlacePrediction[]>(
-    [],
-  );
-  const [destinationSuggestions, setDestinationSuggestions] = useState<
-    google.maps.places.PlacePrediction[]
-  >([]);
+  const [pickupSuggestions, setPickupSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<PlaceSuggestion[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [vehicle, setVehicle] = useState("auto");
   const [when, setWhen] = useState<"now" | "later">("now");
@@ -128,62 +125,30 @@ function Booking() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  // Gợi ý địa điểm kiểu Grab bằng Places API mới (AutocompleteSuggestion) — tự
-  // vẽ dropdown để khớp giao diện sẵn có. Widget Autocomplete cũ đã bị Google
-  // chặn với project mới nên bắt buộc dùng API này. Nếu chưa cấu hình Google
-  // Maps thì ô địa chỉ vẫn là input thường (gõ tay vẫn đặt xe được).
-  async function fetchSuggestions(
-    input: string,
-    setSuggestions: (s: google.maps.places.PlacePrediction[]) => void,
-  ) {
-    if (!isGoogleMapsConfigured || input.trim().length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    try {
-      const g = await loadGoogleMaps();
-      const { suggestions } =
-        await g.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input,
-          includedRegionCodes: ["vn"],
-          language: "vi",
-          // Ưu tiên gợi ý quanh Cao Lãnh, Đồng Tháp.
-          locationBias: { center: { lat: 10.457, lng: 105.634 }, radius: 40000 },
-        });
-      setSuggestions(
-        suggestions
-          .map((s) => s.placePrediction)
-          .filter((p): p is google.maps.places.PlacePrediction => p != null),
-      );
-    } catch {
-      setSuggestions([]);
-    }
-  }
-
-  function debouncedFetch(
-    input: string,
-    setSuggestions: (s: google.maps.places.PlacePrediction[]) => void,
-  ) {
+  // Gợi ý địa điểm kiểu Grab — tự vẽ dropdown để khớp giao diện sẵn có.
+  // fetchPlaceSuggestions tự chọn Places API mới hoặc cũ tuỳ project bật cái nào.
+  // Nếu chưa cấu hình Google Maps thì ô địa chỉ vẫn là input thường (gõ tay vẫn
+  // đặt xe được như trước).
+  function debouncedFetch(input: string, setSuggestions: (s: PlaceSuggestion[]) => void) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchSuggestions(input, setSuggestions), 250);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        setSuggestions(await fetchPlaceSuggestions(input));
+      } catch {
+        setSuggestions([]);
+      }
+    }, 250);
   }
 
-  async function selectSuggestion(
-    prediction: google.maps.places.PlacePrediction,
-    isPickup: boolean,
-  ) {
+  async function selectSuggestion(suggestion: PlaceSuggestion, isPickup: boolean) {
     try {
-      const place = prediction.toPlace();
-      await place.fetchFields({ fields: ["location", "formattedAddress", "displayName"] });
-      const loc = place.location;
-      const addr = place.formattedAddress ?? place.displayName ?? prediction.text.text;
-      const coord = loc ? { lat: loc.lat(), lng: loc.lng() } : null;
+      const { address, coord } = await suggestion.resolve();
       if (isPickup) {
-        setPickup(addr);
+        setPickup(address);
         setPickupCoord(coord);
         setPickupSuggestions([]);
       } else {
-        setDestination(addr);
+        setDestination(address);
         setDestinationCoord(coord);
         setDestinationSuggestions([]);
       }
@@ -676,22 +641,22 @@ function SuggestionDropdown({
   items,
   onPick,
 }: {
-  items: google.maps.places.PlacePrediction[];
-  onPick: (p: google.maps.places.PlacePrediction) => void;
+  items: PlaceSuggestion[];
+  onPick: (s: PlaceSuggestion) => void;
 }) {
   if (items.length === 0) return null;
   return (
     <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-elevated">
-      {items.map((p) => (
+      {items.map((s) => (
         <button
-          key={p.placeId}
+          key={s.id}
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onPick(p)}
+          onClick={() => onPick(s)}
           className="flex w-full items-start gap-2 border-b border-border/50 px-3 py-2.5 text-left last:border-0 hover:bg-background"
         >
           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-          <span className="text-sm">{p.text.text}</span>
+          <span className="text-sm">{s.label}</span>
         </button>
       ))}
     </div>

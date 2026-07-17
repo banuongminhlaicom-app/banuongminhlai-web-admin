@@ -5,7 +5,13 @@ import type { PricingRule } from "./pricing";
 // Trips (booking.tsx, booking.searching.tsx, booking.$id.tsx)
 // ---------------------------------------------------------------------------
 export type TripStatusDb =
-  "searching" | "accepted" | "arriving" | "arrived" | "in_progress" | "completed" | "cancelled";
+  | "searching"
+  | "accepted"
+  | "arriving"
+  | "arrived"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
 
 export interface TripRow {
   id: string;

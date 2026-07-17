@@ -1,5 +1,11 @@
 export type TripStatus =
-  "searching" | "accepted" | "arriving" | "arrived" | "in_progress" | "completed" | "cancelled";
+  | "searching"
+  | "accepted"
+  | "arriving"
+  | "arrived"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
 
 export const TRIP_STATUS_LABEL: Record<TripStatus, string> = {
   searching: "Đang tìm tài xế",
