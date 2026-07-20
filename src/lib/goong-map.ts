@@ -19,6 +19,7 @@ export interface GoongMarker {
 
 export interface GoongMapInstance {
   on(event: string, cb: () => void): void;
+  once(event: string, cb: () => void): void;
   remove(): void;
   addSource(id: string, source: unknown): void;
   addLayer(layer: unknown): void;

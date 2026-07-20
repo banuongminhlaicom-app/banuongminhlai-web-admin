@@ -76,10 +76,17 @@ export function GoongMap({
   }, []);
 
   // Cập nhật marker + tuyến đường mỗi khi toạ độ đổi (vd. xe tài xế di chuyển).
+  // Nếu bản đồ chưa sẵn sàng, hoãn tới sự kiện "load" — nếu bỏ qua luôn thì dữ
+  // liệu về sớm hơn bản đồ sẽ không bao giờ được vẽ.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !readyRef.current || !window.goongjs) return;
-    syncMap(window.goongjs, map);
+    if (!map || !window.goongjs) return;
+    const g = window.goongjs;
+    if (!readyRef.current) {
+      map.once("load", () => syncMap(g, map));
+      return;
+    }
+    syncMap(g, map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     pickup?.lat,
@@ -112,32 +119,7 @@ export function GoongMap({
     put("dropoff", dropoff, "#22c55e");
     put("driver", driver, "#1f2937");
 
-    // Vẽ tuyến đường từ polyline mã hoá của Goong Directions.
-    if (routePolyline) {
-      try {
-        const coords = decodePolyline(routePolyline);
-        const geojson = {
-          type: "Feature",
-          properties: {},
-          geometry: { type: "LineString", coordinates: coords },
-        };
-        const source = map.getSource("route");
-        if (source) {
-          source.setData(geojson);
-        } else {
-          map.addSource("route", { type: "geojson", data: geojson });
-          map.addLayer({
-            id: "route",
-            type: "line",
-            source: "route",
-            layout: { "line-join": "round", "line-cap": "round" },
-            paint: { "line-color": "#ef4444", "line-width": 4, "line-opacity": 0.85 },
-          });
-        }
-      } catch {
-        // Polyline hỏng — bỏ qua phần vẽ tuyến, marker vẫn hiển thị bình thường.
-      }
-    }
+    if (routePolyline) drawRoute(map, routePolyline);
 
     // Căn khung nhìn ôm trọn các điểm đang có.
     const points = [pickup, dropoff, driver].filter((c): c is Coord => !!c);
@@ -148,6 +130,41 @@ export function GoongMap({
       );
       points.forEach((c) => bounds.extend([c.lng, c.lat]));
       map.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 600 });
+    }
+  }
+
+  // Vẽ tuyến đường lên bản đồ. Sự kiện "load" báo bản đồ sẵn sàng nhưng style
+  // có thể chưa nạp xong — addSource/addLayer lúc đó sẽ ném lỗi và tuyến không
+  // hiện (đúng lỗi đã gặp ở màn tài xế). Nên kiểm tra isStyleLoaded() và hoãn
+  // lại tới sự kiện "idle" nếu chưa sẵn sàng.
+  function drawRoute(map: GoongMapInstance, polyline: string, attempt = 0) {
+    if (!map.isStyleLoaded()) {
+      // Giới hạn số lần hoãn để không lặp vô hạn nếu style hỏng hẳn.
+      if (attempt < 5) map.once("idle", () => drawRoute(map, polyline, attempt + 1));
+      return;
+    }
+    try {
+      const geojson = {
+        type: "Feature",
+        properties: {},
+        geometry: { type: "LineString", coordinates: decodePolyline(polyline) },
+      };
+      const source = map.getSource("route");
+      if (source) {
+        source.setData(geojson);
+        return;
+      }
+      map.addSource("route", { type: "geojson", data: geojson });
+      map.addLayer({
+        id: "route",
+        type: "line",
+        source: "route",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#ef4444", "line-width": 4, "line-opacity": 0.85 },
+      });
+    } catch (err) {
+      // Không nuốt lỗi im lặng như trước — ghi log để còn chẩn đoán được.
+      console.error("GoongMap: không vẽ được tuyến đường", err);
     }
   }
 

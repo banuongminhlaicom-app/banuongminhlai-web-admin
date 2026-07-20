@@ -313,12 +313,9 @@ function DriverTripDetail() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <ActionBtn
-            label="Chỉ đường"
-            Icon={Navigation}
-            onClick={() => toast("Mở Google Maps chỉ đường")}
-          />
+        {/* Đã có nút "Chỉ đường" thật (mở Google Maps) ở khối địa chỉ phía trên
+            nên bỏ nút chỉ đường giả ở đây, tránh trùng lặp. */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <ActionBtn label="Báo sự cố" Icon={AlertTriangle} onClick={() => setIssueOpen(true)} />
           <ActionBtn
             label="Hỗ trợ"
