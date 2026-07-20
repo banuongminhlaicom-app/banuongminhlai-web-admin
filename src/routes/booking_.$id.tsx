@@ -17,6 +17,7 @@ import {
   subscribeTripStatus,
 } from "@/lib/queries";
 import { GoongMap } from "@/components/GoongMap";
+import { fetchRoute } from "@/lib/places";
 import { formatKm, formatMinutes, formatVND } from "@/lib/format";
 
 export const Route = createFileRoute("/booking_/$id")({
@@ -57,6 +58,29 @@ function RealBookingDetail({ id }: { id: string }) {
       queryClient.setQueryData(["trip", id], updated);
     });
   }, [id, queryClient]);
+
+  // Tuyến đường của chuyến (điểm đón -> điểm đến) để vẽ lên bản đồ. Tuyến không
+  // đổi trong suốt chuyến nên chỉ gọi 1 lần, tránh tốn lượt gọi Goong.
+  const { data: route } = useQuery({
+    queryKey: [
+      "trip-route",
+      trip?.pickup_lat,
+      trip?.pickup_lng,
+      trip?.dropoff_lat,
+      trip?.dropoff_lng,
+    ],
+    queryFn: () =>
+      fetchRoute(
+        { lat: trip!.pickup_lat!, lng: trip!.pickup_lng! },
+        { lat: trip!.dropoff_lat!, lng: trip!.dropoff_lng! },
+      ),
+    enabled:
+      trip?.pickup_lat != null &&
+      trip?.pickup_lng != null &&
+      trip?.dropoff_lat != null &&
+      trip?.dropoff_lng != null,
+    staleTime: Infinity,
+  });
 
   // Theo dõi vị trí tài xế realtime để hiện xe di chuyển trên bản đồ. Chỉ chạy
   // khi chuyến đang diễn ra — xong chuyến thì dừng, không theo dõi nữa.
@@ -151,6 +175,7 @@ function RealBookingDetail({ id }: { id: string }) {
             : null
         }
         driver={driverLocation}
+        routePolyline={route?.polyline}
         fallbackProps={{ showRoute: true, driverPin: true }}
       />
 

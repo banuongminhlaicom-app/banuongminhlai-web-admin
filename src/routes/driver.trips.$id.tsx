@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocationTracking } from "@/hooks/use-location-tracking";
-import { MapPreview } from "@/components/MapPreview";
+import { GoongMap } from "@/components/GoongMap";
+import { fetchRoute } from "@/lib/places";
 import { useAuthState, useRequireRole } from "@/lib/auth";
 import {
   completeDriverTrip,
@@ -93,6 +94,28 @@ function DriverTripDetail() {
     driverStatus != null && driverStatus !== "offline" && driverStatus !== "completed",
   );
 
+  // Tuyến đường điểm đón -> điểm đến để vẽ lên bản đồ (gọi 1 lần, tuyến cố định).
+  const { data: route } = useQuery({
+    queryKey: [
+      "trip-route",
+      trip?.pickup_lat,
+      trip?.pickup_lng,
+      trip?.dropoff_lat,
+      trip?.dropoff_lng,
+    ],
+    queryFn: () =>
+      fetchRoute(
+        { lat: trip!.pickup_lat!, lng: trip!.pickup_lng! },
+        { lat: trip!.dropoff_lat!, lng: trip!.dropoff_lng! },
+      ),
+    enabled:
+      trip?.pickup_lat != null &&
+      trip?.pickup_lng != null &&
+      trip?.dropoff_lat != null &&
+      trip?.dropoff_lng != null,
+    staleTime: Infinity,
+  });
+
   const cta = useMemo(() => {
     switch (driverStatus) {
       case "going_to_pickup":
@@ -146,7 +169,21 @@ function DriverTripDetail() {
   return (
     <div className="mx-auto min-h-[100dvh] max-w-md bg-background pb-10">
       <div className="relative">
-        <MapPreview className="h-72 w-full" showRoute driverPin />
+        <GoongMap
+          className="h-72 w-full"
+          pickup={
+            trip.pickup_lat != null && trip.pickup_lng != null
+              ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+              : null
+          }
+          dropoff={
+            trip.dropoff_lat != null && trip.dropoff_lng != null
+              ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
+              : null
+          }
+          routePolyline={route?.polyline}
+          fallbackProps={{ showRoute: true, driverPin: true }}
+        />
         <div className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-5 py-3">
           <button
             onClick={() => navigate({ to: "/driver" })}
