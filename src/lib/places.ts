@@ -3,6 +3,8 @@
 // trình duyệt (Goong dùng api_key trong URL, không chặn theo referer như Google).
 // Giữ nguyên interface PlaceSuggestion để booking.tsx không phải đổi.
 
+import { cachedFetch, createRateLimiter } from "./api-cache";
+
 const GOONG_KEY = import.meta.env.VITE_GOONG_API_KEY;
 const GOONG_BASE = "https://rsapi.goong.io";
 
@@ -10,6 +12,20 @@ const GOONG_BASE = "https://rsapi.goong.io";
 const CENTER = { lat: 10.457, lng: 105.634 };
 
 export const isMapConfigured = Boolean(GOONG_KEY);
+
+// Thời gian sống của cache, đặt theo mức độ "ổn định" của từng loại dữ liệu:
+// tên đường/địa danh gần như không đổi, nên cache lâu hơn tuyến đường (có thể
+// thay đổi theo tình hình giao thông).
+const TTL_AUTOCOMPLETE = 30 * 60 * 1000; // 30 phút
+const TTL_PLACE_DETAIL = 24 * 60 * 60 * 1000; // 24 giờ — toạ độ 1 địa điểm gần như cố định
+const TTL_GEOCODE = 60 * 60 * 1000; // 1 giờ
+const TTL_ROUTE = 10 * 60 * 1000; // 10 phút
+
+// Autocomplete tốn lượt nhất vì gõ mỗi chữ là một lượt gọi. Cho phép bùng 10
+// lượt liên tiếp (người dùng gõ nhanh một địa chỉ dài), sau đó giới hạn ~2
+// lượt/giây. Các API còn lại thưa hơn nhiều nên nới rộng hơn.
+const allowAutocomplete = createRateLimiter(10, 2);
+const allowOtherApis = createRateLimiter(20, 5);
 
 export interface PlaceSuggestion {
   id: string;
@@ -24,16 +40,27 @@ interface GoongPrediction {
 }
 
 // Gõ tìm địa chỉ — trả về danh sách gợi ý (Goong Place Autocomplete).
+// Gõ lùi/gõ lại cùng một chuỗi sẽ lấy từ cache, không tốn thêm lượt gọi.
 export async function fetchPlaceSuggestions(input: string): Promise<PlaceSuggestion[]> {
-  if (!isMapConfigured || input.trim().length < 2) return [];
-  const url =
-    `${GOONG_BASE}/Place/AutoComplete?api_key=${GOONG_KEY}` +
-    `&input=${encodeURIComponent(input)}` +
-    `&location=${CENTER.lat},${CENTER.lng}&radius=50&more_compound=true`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Goong AutoComplete lỗi ${res.status}`);
-  const data = (await res.json()) as { predictions?: GoongPrediction[] };
-  return (data.predictions ?? []).map((p) => ({
+  const query = input.trim();
+  if (!isMapConfigured || query.length < 2) return [];
+
+  // Chuẩn hoá key để "Chợ Cao Lãnh" và "chợ  cao lãnh" dùng chung một cache.
+  const cacheKey = `ac:${query.toLowerCase().replace(/\s+/g, " ")}`;
+
+  const predictions = await cachedFetch<GoongPrediction[]>(cacheKey, TTL_AUTOCOMPLETE, async () => {
+    if (!allowAutocomplete()) throw new Error("Gọi Goong quá nhanh, bỏ qua lượt này.");
+    const url =
+      `${GOONG_BASE}/Place/AutoComplete?api_key=${GOONG_KEY}` +
+      `&input=${encodeURIComponent(query)}` +
+      `&location=${CENTER.lat},${CENTER.lng}&radius=50&more_compound=true`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Goong AutoComplete lỗi ${res.status}`);
+    const data = (await res.json()) as { predictions?: GoongPrediction[] };
+    return data.predictions ?? [];
+  });
+
+  return predictions.map((p) => ({
     id: p.place_id,
     label: p.description,
     resolve: () => resolvePlace(p.place_id, p.description),
@@ -43,16 +70,19 @@ export async function fetchPlaceSuggestions(input: string): Promise<PlaceSuggest
 // Lấy toạ độ + địa chỉ đầy đủ của 1 place (Goong Place Detail).
 async function resolvePlace(placeId: string, fallbackLabel: string) {
   try {
-    const url = `${GOONG_BASE}/Place/Detail?place_id=${encodeURIComponent(placeId)}&api_key=${GOONG_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Goong Detail lỗi ${res.status}`);
-    const data = (await res.json()) as {
+    const data = await cachedFetch<{
       result?: {
         formatted_address?: string;
         name?: string;
         geometry?: { location?: { lat: number; lng: number } };
       };
-    };
+    }>(`detail:${placeId}`, TTL_PLACE_DETAIL, async () => {
+      if (!allowOtherApis()) throw new Error("Gọi Goong quá nhanh, bỏ qua lượt này.");
+      const url = `${GOONG_BASE}/Place/Detail?place_id=${encodeURIComponent(placeId)}&api_key=${GOONG_KEY}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Goong Detail lỗi ${res.status}`);
+      return res.json();
+    });
     const loc = data.result?.geometry?.location;
     return {
       address: data.result?.formatted_address ?? data.result?.name ?? fallbackLabel,
@@ -73,26 +103,31 @@ export async function fetchRoute(
 ): Promise<{ distanceKm: number; durationMin: number; polyline?: string | null } | null> {
   if (isMapConfigured) {
     try {
-      const url =
-        `${GOONG_BASE}/Direction?origin=${origin.lat},${origin.lng}` +
-        `&destination=${destination.lat},${destination.lng}&vehicle=car&api_key=${GOONG_KEY}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = (await res.json()) as {
-          routes?: {
-            overview_polyline?: { points?: string };
-            legs?: { distance?: { value: number }; duration?: { value: number } }[];
-          }[];
+      // Làm tròn toạ độ tới ~11m khi tạo key: GPS luôn nhiễu vài mét, nếu dùng
+      // toạ độ thô thì mỗi lần lệch 1m lại tính là tuyến mới và gọi lại API.
+      const k = (c: { lat: number; lng: number }) => `${c.lat.toFixed(4)},${c.lng.toFixed(4)}`;
+      const data = await cachedFetch<{
+        routes?: {
+          overview_polyline?: { points?: string };
+          legs?: { distance?: { value: number }; duration?: { value: number } }[];
+        }[];
+      }>(`route:${k(origin)}>${k(destination)}`, TTL_ROUTE, async () => {
+        if (!allowOtherApis()) throw new Error("Gọi Goong quá nhanh, bỏ qua lượt này.");
+        const url =
+          `${GOONG_BASE}/Direction?origin=${origin.lat},${origin.lng}` +
+          `&destination=${destination.lat},${destination.lng}&vehicle=car&api_key=${GOONG_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Goong Direction lỗi ${res.status}`);
+        return res.json();
+      });
+      const route = data.routes?.[0];
+      const leg = route?.legs?.[0];
+      if (leg?.distance) {
+        return {
+          distanceKm: (leg.distance.value ?? 0) / 1000,
+          durationMin: (leg.duration?.value ?? 0) / 60,
+          polyline: route?.overview_polyline?.points ?? null,
         };
-        const route = data.routes?.[0];
-        const leg = route?.legs?.[0];
-        if (leg?.distance) {
-          return {
-            distanceKm: (leg.distance.value ?? 0) / 1000,
-            durationMin: (leg.duration?.value ?? 0) / 60,
-            polyline: route?.overview_polyline?.points ?? null,
-          };
-        }
       }
     } catch {
       // rơi xuống ước lượng bên dưới
@@ -108,10 +143,20 @@ export async function fetchRoute(
 export async function reverseGeocode(coord: { lat: number; lng: number }): Promise<string | null> {
   if (!isMapConfigured) return null;
   try {
-    const url = `${GOONG_BASE}/Geocode?latlng=${coord.lat},${coord.lng}&api_key=${GOONG_KEY}`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = (await res.json()) as { results?: { formatted_address?: string }[] };
+    // Cùng lý do làm tròn như tuyến đường: đứng yên một chỗ mà GPS nhiễu vài
+    // mét thì không nên gọi lại API.
+    const key = `geo:${coord.lat.toFixed(4)},${coord.lng.toFixed(4)}`;
+    const data = await cachedFetch<{ results?: { formatted_address?: string }[] }>(
+      key,
+      TTL_GEOCODE,
+      async () => {
+        if (!allowOtherApis()) throw new Error("Gọi Goong quá nhanh, bỏ qua lượt này.");
+        const url = `${GOONG_BASE}/Geocode?latlng=${coord.lat},${coord.lng}&api_key=${GOONG_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Goong Geocode lỗi ${res.status}`);
+        return res.json();
+      },
+    );
     return data.results?.[0]?.formatted_address ?? null;
   } catch {
     return null;

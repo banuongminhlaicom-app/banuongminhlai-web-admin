@@ -18,7 +18,7 @@ import {
 } from "@/lib/queries";
 import { GoongMap } from "@/components/GoongMap";
 import { fetchRoute } from "@/lib/places";
-import { formatKm, formatMinutes, formatVND } from "@/lib/format";
+import { formatKm, formatMinutes, formatRelativeTime, formatVND } from "@/lib/format";
 
 export const Route = createFileRoute("/booking_/$id")({
   component: BookingDetail,
@@ -87,21 +87,23 @@ function RealBookingDetail({ id }: { id: string }) {
   const driverId = trip?.driver_id ?? null;
   const tripActive =
     trip != null && ["accepted", "arriving", "arrived", "in_progress"].includes(trip.status);
-  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Dùng useQuery thay vì state thuần để có sẵn polling dự phòng: Realtime đẩy
+  // vị trí tức thì, nhưng nếu WebSocket đứt (khách khoá máy, mạng chập chờn)
+  // thì các cập nhật trong lúc đó mất luôn — polling 10s giúp tự lành.
+  const { data: driverLocation } = useQuery({
+    queryKey: ["driver-location", driverId],
+    queryFn: () => getDriverLocation(driverId!),
+    enabled: !!driverId && tripActive,
+    refetchInterval: 10000,
+  });
 
   useEffect(() => {
-    if (!driverId || !tripActive) {
-      setDriverLocation(null);
-      return;
-    }
-    // Lấy vị trí hiện có ngay, rồi nghe cập nhật realtime sau đó.
-    getDriverLocation(driverId)
-      .then((loc) => loc && setDriverLocation({ lat: loc.lat, lng: loc.lng }))
-      .catch(() => {});
+    if (!driverId || !tripActive) return;
     return subscribeDriverLocation(driverId, (loc) =>
-      setDriverLocation({ lat: loc.lat, lng: loc.lng }),
+      queryClient.setQueryData(["driver-location", driverId], loc),
     );
-  }, [driverId, tripActive]);
+  }, [driverId, tripActive, queryClient]);
 
   useEffect(() => {
     if (trip?.status === "searching") {
@@ -174,10 +176,17 @@ function RealBookingDetail({ id }: { id: string }) {
             ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
             : null
         }
-        driver={driverLocation}
+        driver={driverLocation ? { lat: driverLocation.lat, lng: driverLocation.lng } : null}
         routePolyline={route?.polyline}
         fallbackProps={{ showRoute: true, driverPin: true }}
       />
+
+      {/* Cho khách biết vị trí xe còn mới hay đã cũ. Quan trọng vì khi tài xế mở
+          Google Maps chỉ đường, trình duyệt bị treo nền và ngừng gửi vị trí —
+          không có dòng này khách dễ tưởng xe đứng yên hoặc app hỏng. */}
+      {tripActive && driverLocation?.updatedAt && (
+        <LocationFreshness updatedAt={driverLocation.updatedAt} />
+      )}
 
       <div className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-5 py-3">
         <button
@@ -383,6 +392,34 @@ function RealCompletedSection({ tripId, onDone }: { tripId: string; onDone: () =
 // Nhánh mô phỏng cũ — giữ nguyên hành vi gốc cho các link dùng id ngắn (không
 // phải UUID thật), ví dụ từ danh sách /trips vẫn còn là dữ liệu mock.
 // ---------------------------------------------------------------------------
+// Hiện "Vị trí xe: cập nhật X trước", tự đếm lại mỗi 10 giây. Chuyển sang màu
+// cảnh báo khi vị trí quá cũ (thường là do tài xế đang ở app khác).
+function LocationFreshness({ updatedAt }: { updatedAt: string }) {
+  const [, forceTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => forceTick((n) => n + 1), 10000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const ageMs = Date.now() - new Date(updatedAt).getTime();
+  const stale = ageMs > 60_000;
+
+  return (
+    <div
+      className={cn(
+        "absolute inset-x-0 top-[55vh] -mt-9 px-5 text-[11px]",
+        stale ? "text-warning" : "text-muted-foreground",
+      )}
+    >
+      <span className="rounded-full bg-surface/95 px-2.5 py-1 backdrop-blur">
+        Vị trí xe: {formatRelativeTime(updatedAt)}
+        {stale && " · tài xế có thể đang dùng ứng dụng chỉ đường"}
+      </span>
+    </div>
+  );
+}
+
 function MockBookingDetail({ id }: { id: string }) {
   const navigate = useNavigate();
   const driver = MOCK_DRIVERS[0];
