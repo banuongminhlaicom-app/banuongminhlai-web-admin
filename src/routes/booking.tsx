@@ -20,8 +20,7 @@ import {
 } from "lucide-react";
 import { MapPreview } from "@/components/MapPreview";
 import { useAuthState, useRequireRole } from "@/lib/auth";
-import { isGoogleMapsConfigured, loadGoogleMaps } from "@/lib/google-maps";
-import { fetchPlaceSuggestions, type PlaceSuggestion } from "@/lib/places";
+import { fetchPlaceSuggestions, fetchRoute, type PlaceSuggestion } from "@/lib/places";
 import {
   createTrip,
   getAddresses,
@@ -157,35 +156,15 @@ function Booking() {
     }
   }
 
-  // Khi đã có toạ độ thật cả 2 đầu, tính khoảng cách/thời gian thật qua Directions API.
+  // Khi đã có toạ độ thật cả 2 đầu, tính khoảng cách/thời gian thật qua Goong Directions.
   useEffect(() => {
-    if (!isGoogleMapsConfigured || !pickupCoord || !destinationCoord) {
+    if (!pickupCoord || !destinationCoord) {
       setRouteInfo(null);
       return;
     }
     let cancelled = false;
-    loadGoogleMaps().then((g) => {
-      if (cancelled) return;
-      const directionsService = new g.maps.DirectionsService();
-      directionsService.route(
-        {
-          origin: pickupCoord,
-          destination: destinationCoord,
-          travelMode: g.maps.TravelMode.DRIVING,
-        },
-        (result, status) => {
-          if (cancelled) return;
-          if (status === "OK" && result?.routes[0]?.legs[0]) {
-            const leg = result.routes[0].legs[0];
-            setRouteInfo({
-              distanceKm: (leg.distance?.value ?? 0) / 1000,
-              durationMin: (leg.duration?.value ?? 0) / 60,
-            });
-          } else {
-            setRouteInfo(null);
-          }
-        },
-      );
+    fetchRoute(pickupCoord, destinationCoord).then((info) => {
+      if (!cancelled) setRouteInfo(info);
     });
     return () => {
       cancelled = true;

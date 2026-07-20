@@ -1,7 +1,16 @@
-import { isGoogleMapsConfigured, loadGoogleMaps } from "./google-maps";
+// Lớp bản đồ dùng Goong.io (dịch vụ bản đồ Việt Nam) — thay Google Maps để
+// tối ưu chi phí + dữ liệu địa chỉ VN tốt cho Cao Lãnh. Gọi REST trực tiếp từ
+// trình duyệt (Goong dùng api_key trong URL, không chặn theo referer như Google).
+// Giữ nguyên interface PlaceSuggestion để booking.tsx không phải đổi.
 
-// Gợi ý địa điểm đã chuẩn hoá, dùng chung cho cả Places API mới lẫn cũ để
-// booking.tsx không phải biết đang chạy API nào.
+const GOONG_KEY = import.meta.env.VITE_GOONG_API_KEY;
+const GOONG_BASE = "https://rsapi.goong.io";
+
+// Cao Lãnh, Đồng Tháp — tâm khu vực để ưu tiên gợi ý địa chỉ quanh đây.
+const CENTER = { lat: 10.457, lng: 105.634 };
+
+export const isMapConfigured = Boolean(GOONG_KEY);
+
 export interface PlaceSuggestion {
   id: string;
   label: string;
@@ -9,79 +18,93 @@ export interface PlaceSuggestion {
   resolve: () => Promise<{ address: string; coord: { lat: number; lng: number } | null }>;
 }
 
-// Cao Lãnh, Đồng Tháp — ưu tiên gợi ý quanh khu vực đang hoạt động.
-const CENTER = { lat: 10.457, lng: 105.634 };
-const RADIUS_M = 40000;
+interface GoongPrediction {
+  place_id: string;
+  description: string;
+}
 
-// Thử "Places API (New)" trước; nếu project chưa bật dịch vụ đó thì rơi về
-// "Places API" cũ (nhiều project chỉ bật cái cũ). Giữ nguyên giao diện gọi hàm.
+// Gõ tìm địa chỉ — trả về danh sách gợi ý (Goong Place Autocomplete).
 export async function fetchPlaceSuggestions(input: string): Promise<PlaceSuggestion[]> {
-  if (!isGoogleMapsConfigured || input.trim().length < 2) return [];
-  const g = await loadGoogleMaps();
-  try {
-    return await fetchViaNewApi(g, input);
-  } catch {
-    return await fetchViaLegacyApi(g, input);
-  }
-}
-
-async function fetchViaNewApi(g: typeof google, input: string): Promise<PlaceSuggestion[]> {
-  const { suggestions } = await g.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-    input,
-    includedRegionCodes: ["vn"],
-    language: "vi",
-    locationBias: { center: CENTER, radius: RADIUS_M },
-  });
-  return suggestions
-    .map((s) => s.placePrediction)
-    .filter((p): p is google.maps.places.PlacePrediction => p != null)
-    .map((p) => ({
-      id: p.placeId,
-      label: p.text.text,
-      resolve: async () => {
-        const place = p.toPlace();
-        await place.fetchFields({ fields: ["location", "formattedAddress", "displayName"] });
-        const loc = place.location;
-        return {
-          address: place.formattedAddress ?? place.displayName ?? p.text.text,
-          coord: loc ? { lat: loc.lat(), lng: loc.lng() } : null,
-        };
-      },
-    }));
-}
-
-async function fetchViaLegacyApi(g: typeof google, input: string): Promise<PlaceSuggestion[]> {
-  const service = new g.maps.places.AutocompleteService();
-  const res = await service.getPlacePredictions({
-    input,
-    componentRestrictions: { country: "vn" },
-    locationBias: { center: CENTER, radius: RADIUS_M },
-  });
-  return res.predictions.map((p) => ({
+  if (!isMapConfigured || input.trim().length < 2) return [];
+  const url =
+    `${GOONG_BASE}/Place/AutoComplete?api_key=${GOONG_KEY}` +
+    `&input=${encodeURIComponent(input)}` +
+    `&location=${CENTER.lat},${CENTER.lng}&radius=50&more_compound=true`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Goong AutoComplete lỗi ${res.status}`);
+  const data = (await res.json()) as { predictions?: GoongPrediction[] };
+  return (data.predictions ?? []).map((p) => ({
     id: p.place_id,
     label: p.description,
-    resolve: () => resolveLegacyPlace(g, p),
+    resolve: () => resolvePlace(p.place_id, p.description),
   }));
 }
 
-function resolveLegacyPlace(g: typeof google, p: google.maps.places.AutocompletePrediction) {
-  return new Promise<{ address: string; coord: { lat: number; lng: number } | null }>((resolve) => {
-    const service = new g.maps.places.PlacesService(document.createElement("div"));
-    service.getDetails(
-      { placeId: p.place_id, fields: ["geometry", "formatted_address", "name"] },
-      (place, status) => {
-        const loc = place?.geometry?.location;
-        if (status === g.maps.places.PlacesServiceStatus.OK && loc) {
-          resolve({
-            address: place?.formatted_address ?? place?.name ?? p.description,
-            coord: { lat: loc.lat(), lng: loc.lng() },
-          });
-        } else {
-          // Không lấy được chi tiết — vẫn dùng text gợi ý, chỉ thiếu toạ độ nên
-          // giá sẽ tính theo ước lượng thay vì khoảng cách thật.
-          resolve({ address: p.description, coord: null });
+// Lấy toạ độ + địa chỉ đầy đủ của 1 place (Goong Place Detail).
+async function resolvePlace(placeId: string, fallbackLabel: string) {
+  try {
+    const url = `${GOONG_BASE}/Place/Detail?place_id=${encodeURIComponent(placeId)}&api_key=${GOONG_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Goong Detail lỗi ${res.status}`);
+    const data = (await res.json()) as {
+      result?: {
+        formatted_address?: string;
+        name?: string;
+        geometry?: { location?: { lat: number; lng: number } };
+      };
+    };
+    const loc = data.result?.geometry?.location;
+    return {
+      address: data.result?.formatted_address ?? data.result?.name ?? fallbackLabel,
+      coord: loc ? { lat: loc.lat, lng: loc.lng } : null,
+    };
+  } catch {
+    // Không lấy được chi tiết — vẫn dùng text gợi ý, chỉ thiếu toạ độ nên giá
+    // sẽ tính theo ước lượng thay vì khoảng cách thật.
+    return { address: fallbackLabel, coord: null };
+  }
+}
+
+// Tính khoảng cách + thời gian thật giữa 2 điểm (Goong Directions). Nếu Goong
+// lỗi mà vẫn có toạ độ thì ước lượng bằng đường chim bay × hệ số đường bộ.
+export async function fetchRoute(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+): Promise<{ distanceKm: number; durationMin: number } | null> {
+  if (isMapConfigured) {
+    try {
+      const url =
+        `${GOONG_BASE}/Direction?origin=${origin.lat},${origin.lng}` +
+        `&destination=${destination.lat},${destination.lng}&vehicle=car&api_key=${GOONG_KEY}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as {
+          routes?: { legs?: { distance?: { value: number }; duration?: { value: number } }[] }[];
+        };
+        const leg = data.routes?.[0]?.legs?.[0];
+        if (leg?.distance) {
+          return {
+            distanceKm: (leg.distance.value ?? 0) / 1000,
+            durationMin: (leg.duration?.value ?? 0) / 60,
+          };
         }
-      },
-    );
-  });
+      }
+    } catch {
+      // rơi xuống ước lượng bên dưới
+    }
+  }
+  // Ước lượng dự phòng: đường chim bay × 1.3 (hệ số đường bộ), ~30 km/h.
+  const km = haversineKm(origin, destination) * 1.3;
+  if (km <= 0) return null;
+  return { distanceKm: km, durationMin: (km / 30) * 60 };
+}
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
 }
