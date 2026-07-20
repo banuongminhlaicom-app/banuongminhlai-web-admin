@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useLocationTracking } from "@/hooks/use-location-tracking";
 import { MapPreview } from "@/components/MapPreview";
 import { DriverShell } from "@/components/DriverShell";
+import { LocationPermissionCard } from "@/components/LocationPermissionCard";
 import { useAuthState, useRequireRole } from "@/lib/auth";
 import {
   acceptAssignedTrip,
@@ -284,6 +285,11 @@ function DriverHome() {
           </label>
         </div>
       </section>
+
+      {/* Tài xế bắt buộc cần định vị để khách theo dõi được xe đang tới đón. */}
+      <div className="px-4 pt-4">
+        <LocationPermissionCard role="driver" />
+      </div>
 
       {/* ============ MAP ============ */}
       <section className="px-4 pt-4">

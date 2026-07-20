@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { MapPin, Navigation } from "lucide-react";
+import { MapPin, Navigation, User } from "lucide-react";
 
 /**
  * Google Maps embed for Cao Lãnh, Đồng Tháp.
@@ -68,8 +68,8 @@ export function MapPreview({
 
       {driverPin && (
         <div className="pointer-events-none absolute left-1/3 top-1/3 -translate-x-1/2 -translate-y-1/2">
-          <div className="grid h-10 w-10 place-items-center rounded-full border-2 border-white bg-foreground text-background text-lg shadow-elevated">
-            🚗
+          <div className="grid h-10 w-10 place-items-center rounded-full border-2 border-white bg-foreground text-background shadow-elevated">
+            <User className="h-5 w-5" />
           </div>
         </div>
       )}
@@ -77,13 +77,15 @@ export function MapPreview({
   );
 }
 
+// Dịch vụ này là lái xe hộ — cái đang di chuyển tới đón khách là NGƯỜI tài xế,
+// không phải xe (xe là của khách). Nên dùng icon người thay vì icon ô tô.
 function DriverDot({ className }: { className?: string }) {
   return (
     <div
       className={cn("pointer-events-none absolute -translate-x-1/2 -translate-y-1/2", className)}
     >
-      <div className="grid h-7 w-7 place-items-center rounded-full bg-foreground text-background text-sm shadow-elevated ring-2 ring-background/70">
-        🚗
+      <div className="grid h-7 w-7 place-items-center rounded-full bg-foreground text-background shadow-elevated ring-2 ring-background/70">
+        <User className="h-3.5 w-3.5" />
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { MapPreview } from "@/components/MapPreview";
 import { EmergencyButton } from "@/components/EmergencyButton";
 import { BrandLogo } from "@/components/BrandLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LocationPermissionCard } from "@/components/LocationPermissionCard";
 import { useAuthState, useRequireRole } from "@/lib/auth";
 import { getAddresses } from "@/lib/queries";
 
@@ -51,6 +52,11 @@ function HomeScreen() {
           </div>
         </div>
       </header>
+
+      {/* Mời bật định vị nếu chưa cấp quyền — tự ẩn khi đã cho phép. */}
+      <div className="px-4 pb-2">
+        <LocationPermissionCard role="customer" />
+      </div>
 
       {/* Map with floating bottom sheet */}
       <section className="relative px-4">
