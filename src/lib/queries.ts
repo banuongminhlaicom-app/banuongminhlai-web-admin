@@ -20,6 +20,10 @@ export interface TripRow {
   driver_id: string | null;
   pickup_address: string;
   dropoff_address: string;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
+  dropoff_lat: number | null;
+  dropoff_lng: number | null;
   distance_km: number | null;
   duration_min: number | null;
   vehicle_type: string;
@@ -43,6 +47,8 @@ export async function createTrip(input: {
   customerId: string;
   pickupAddress: string;
   dropoffAddress: string;
+  pickupCoord?: { lat: number; lng: number } | null;
+  dropoffCoord?: { lat: number; lng: number } | null;
   distanceKm: number;
   durationMin: number;
   vehicleType: string;
@@ -59,6 +65,10 @@ export async function createTrip(input: {
       customer_id: input.customerId,
       pickup_address: input.pickupAddress,
       dropoff_address: input.dropoffAddress,
+      pickup_lat: input.pickupCoord?.lat ?? null,
+      pickup_lng: input.pickupCoord?.lng ?? null,
+      dropoff_lat: input.dropoffCoord?.lat ?? null,
+      dropoff_lng: input.dropoffCoord?.lng ?? null,
       distance_km: input.distanceKm,
       duration_min: input.durationMin,
       vehicle_type: input.vehicleType,
@@ -69,7 +79,7 @@ export async function createTrip(input: {
       status: "searching",
     })
     .select(
-      "id, code, customer_id, driver_id, pickup_address, dropoff_address, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
     )
     .single();
   if (error) throw error;
@@ -81,7 +91,7 @@ export async function getTrip(id: string): Promise<TripRow | null> {
   const { data, error } = await supabase
     .from("trips")
     .select(
-      "id, code, customer_id, driver_id, pickup_address, dropoff_address, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -649,7 +659,7 @@ export async function getAdminDashboardStats(): Promise<AdminDashboardStats> {
     client
       .from("trips")
       .select(
-        "id, code, customer_id, driver_id, pickup_address, dropoff_address, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+        "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(5),
@@ -846,6 +856,67 @@ export async function getAdminReportsStats(): Promise<AdminReportsStats> {
     cancelRatePercent,
     cancelRateDeltaPoints,
     topDrivers,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Vị trí tài xế theo thời gian thực (Giai đoạn 7)
+// ---------------------------------------------------------------------------
+export interface DriverLocation {
+  lat: number;
+  lng: number;
+  updatedAt: string | null;
+}
+
+// Tài xế gửi vị trí của chính mình (qua RPC nên không sửa được cột khác).
+export async function updateDriverLocation(lat: number, lng: number): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.rpc("update_driver_location", { p_lat: lat, p_lng: lng });
+  if (error) throw error;
+}
+
+export async function getDriverLocation(driverId: string): Promise<DriverLocation | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("drivers")
+    .select("current_lat, current_lng, location_updated_at")
+    .eq("id", driverId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.current_lat || !data?.current_lng) return null;
+  return { lat: data.current_lat, lng: data.current_lng, updatedAt: data.location_updated_at };
+}
+
+// Khách nghe vị trí tài xế đang chở mình — dùng Supabase Realtime (WebSocket).
+export function subscribeDriverLocation(
+  driverId: string,
+  onUpdate: (loc: DriverLocation) => void,
+): () => void {
+  if (!supabase) return () => {};
+  const client = supabase;
+  const channel = client
+    .channel(`driver-location-${driverId}`)
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "drivers", filter: `id=eq.${driverId}` },
+      (payload) => {
+        const row = payload.new as {
+          current_lat: number | null;
+          current_lng: number | null;
+          location_updated_at: string | null;
+        };
+        if (row.current_lat != null && row.current_lng != null) {
+          onUpdate({
+            lat: row.current_lat,
+            lng: row.current_lng,
+            updatedAt: row.location_updated_at,
+          });
+        }
+      },
+    )
+    .subscribe();
+  return () => {
+    client.removeChannel(channel);
   };
 }
 

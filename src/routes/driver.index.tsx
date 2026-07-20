@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocationTracking } from "@/hooks/use-location-tracking";
 import { MapPreview } from "@/components/MapPreview";
 import { DriverShell } from "@/components/DriverShell";
 import { useAuthState, useRequireRole } from "@/lib/auth";
@@ -168,6 +169,9 @@ function DriverHome() {
     currentTrip && driverSelf && driverSelf.status !== "offline" && driverSelf.status !== "online",
   );
   const online = driverSelf?.online ?? false;
+
+  // Gửi vị trí GPS lên server khi tài xế online, để khách thấy xe di chuyển.
+  useLocationTracking(online);
 
   return (
     <DriverShell>

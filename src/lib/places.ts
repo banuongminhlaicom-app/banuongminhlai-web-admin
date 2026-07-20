@@ -70,7 +70,7 @@ async function resolvePlace(placeId: string, fallbackLabel: string) {
 export async function fetchRoute(
   origin: { lat: number; lng: number },
   destination: { lat: number; lng: number },
-): Promise<{ distanceKm: number; durationMin: number } | null> {
+): Promise<{ distanceKm: number; durationMin: number; polyline?: string | null } | null> {
   if (isMapConfigured) {
     try {
       const url =
@@ -79,13 +79,18 @@ export async function fetchRoute(
       const res = await fetch(url);
       if (res.ok) {
         const data = (await res.json()) as {
-          routes?: { legs?: { distance?: { value: number }; duration?: { value: number } }[] }[];
+          routes?: {
+            overview_polyline?: { points?: string };
+            legs?: { distance?: { value: number }; duration?: { value: number } }[];
+          }[];
         };
-        const leg = data.routes?.[0]?.legs?.[0];
+        const route = data.routes?.[0];
+        const leg = route?.legs?.[0];
         if (leg?.distance) {
           return {
             distanceKm: (leg.distance.value ?? 0) / 1000,
             durationMin: (leg.duration?.value ?? 0) / 60,
+            polyline: route?.overview_polyline?.points ?? null,
           };
         }
       }
@@ -97,6 +102,43 @@ export async function fetchRoute(
   const km = haversineKm(origin, destination) * 1.3;
   if (km <= 0) return null;
   return { distanceKm: km, durationMin: (km / 30) * 60 };
+}
+
+// Đổi toạ độ GPS thành địa chỉ đọc được (Goong Geocoding).
+export async function reverseGeocode(coord: { lat: number; lng: number }): Promise<string | null> {
+  if (!isMapConfigured) return null;
+  try {
+    const url = `${GOONG_BASE}/Geocode?latlng=${coord.lat},${coord.lng}&api_key=${GOONG_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { results?: { formatted_address?: string }[] };
+    return data.results?.[0]?.formatted_address ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Lấy vị trí GPS của thiết bị. Trình duyệt sẽ hỏi quyền truy cập vị trí.
+export function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      reject(new Error("Thiết bị không hỗ trợ định vị."));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (err) => {
+        const msg =
+          err.code === err.PERMISSION_DENIED
+            ? "Bạn đã từ chối quyền truy cập vị trí. Hãy bật lại trong cài đặt trình duyệt."
+            : err.code === err.TIMEOUT
+              ? "Lấy vị trí quá lâu, vui lòng thử lại."
+              : "Không lấy được vị trí hiện tại.";
+        reject(new Error(msg));
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  });
 }
 
 function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {

@@ -10,6 +10,7 @@ import {
   Clock,
   CreditCard,
   Loader2,
+  LocateFixed,
   MapPin,
   Navigation,
   Pencil,
@@ -18,9 +19,15 @@ import {
   Tag,
   X,
 } from "lucide-react";
-import { MapPreview } from "@/components/MapPreview";
+import { GoongMap } from "@/components/GoongMap";
 import { useAuthState, useRequireRole } from "@/lib/auth";
-import { fetchPlaceSuggestions, fetchRoute, type PlaceSuggestion } from "@/lib/places";
+import {
+  fetchPlaceSuggestions,
+  fetchRoute,
+  getCurrentPosition,
+  reverseGeocode,
+  type PlaceSuggestion,
+} from "@/lib/places";
 import {
   createTrip,
   getAddresses,
@@ -95,9 +102,11 @@ function Booking() {
   const [destinationCoord, setDestinationCoord] = useState<{ lat: number; lng: number } | null>(
     null,
   );
-  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(
-    null,
-  );
+  const [routeInfo, setRouteInfo] = useState<{
+    distanceKm: number;
+    durationMin: number;
+    polyline?: string | null;
+  } | null>(null);
   const [pickupSuggestions, setPickupSuggestions] = useState<PlaceSuggestion[]>([]);
   const [destinationSuggestions, setDestinationSuggestions] = useState<PlaceSuggestion[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -123,11 +132,28 @@ function Booking() {
   const [promoChecking, setPromoChecking] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
+
+  // Lấy vị trí GPS của thiết bị rồi đổi thành địa chỉ để điền vào ô điểm đón.
+  async function useCurrentLocation() {
+    setLocating(true);
+    try {
+      const coord = await getCurrentPosition();
+      const address = await reverseGeocode(coord);
+      setPickup(address ?? `${coord.lat.toFixed(6)}, ${coord.lng.toFixed(6)}`);
+      setPickupCoord(coord);
+      setPickupSuggestions([]);
+      toast.success("Đã lấy vị trí hiện tại");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không lấy được vị trí.");
+    } finally {
+      setLocating(false);
+    }
+  }
 
   // Gợi ý địa điểm kiểu Grab — tự vẽ dropdown để khớp giao diện sẵn có.
-  // fetchPlaceSuggestions tự chọn Places API mới hoặc cũ tuỳ project bật cái nào.
-  // Nếu chưa cấu hình Google Maps thì ô địa chỉ vẫn là input thường (gõ tay vẫn
-  // đặt xe được như trước).
+  // fetchPlaceSuggestions gọi Goong Places. Nếu chưa cấu hình Goong thì ô địa
+  // chỉ vẫn là input thường (gõ tay vẫn đặt xe được như trước).
   function debouncedFetch(input: string, setSuggestions: (s: PlaceSuggestion[]) => void) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
@@ -235,6 +261,8 @@ function Booking() {
         customerId: userId,
         pickupAddress: pickup.trim(),
         dropoffAddress: destination.trim(),
+        pickupCoord,
+        dropoffCoord: destinationCoord,
         distanceKm,
         durationMin: duration,
         vehicleType: vehicleLabel,
@@ -268,7 +296,13 @@ function Booking() {
         <h1 className="text-base font-semibold">Đặt tài xế</h1>
       </div>
 
-      <MapPreview className="h-48 w-full" showRoute />
+      <GoongMap
+        className="h-48 w-full"
+        pickup={pickupCoord}
+        dropoff={destinationCoord}
+        routePolyline={routeInfo?.polyline}
+        fallbackProps={{ showRoute: true }}
+      />
 
       <div className="-mt-5 rounded-t-3xl bg-background px-5 pt-5">
         {/* Locations */}
@@ -289,8 +323,21 @@ function Booking() {
                     debouncedFetch(e.target.value, setPickupSuggestions);
                   }}
                   placeholder="Tài xế sẽ đến đón bạn ở đâu?"
-                  className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40"
+                  className="w-full rounded-xl bg-background py-2.5 pl-3 pr-11 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40"
                 />
+                <button
+                  type="button"
+                  onClick={useCurrentLocation}
+                  disabled={locating}
+                  title="Dùng vị trí hiện tại"
+                  className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-primary transition hover:bg-primary/10 disabled:opacity-50"
+                >
+                  {locating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LocateFixed className="h-4 w-4" />
+                  )}
+                </button>
                 <SuggestionDropdown
                   items={pickupSuggestions}
                   onPick={(p) => selectSuggestion(p, true)}

@@ -10,10 +10,13 @@ import { useRequireRole } from "@/lib/auth";
 import {
   cancelTrip,
   getAssignedDriverInfo,
+  getDriverLocation,
   getTrip,
   rateTrip,
+  subscribeDriverLocation,
   subscribeTripStatus,
 } from "@/lib/queries";
+import { GoongMap } from "@/components/GoongMap";
 import { formatKm, formatMinutes, formatVND } from "@/lib/format";
 
 export const Route = createFileRoute("/booking_/$id")({
@@ -54,6 +57,27 @@ function RealBookingDetail({ id }: { id: string }) {
       queryClient.setQueryData(["trip", id], updated);
     });
   }, [id, queryClient]);
+
+  // Theo dõi vị trí tài xế realtime để hiện xe di chuyển trên bản đồ. Chỉ chạy
+  // khi chuyến đang diễn ra — xong chuyến thì dừng, không theo dõi nữa.
+  const driverId = trip?.driver_id ?? null;
+  const tripActive =
+    trip != null && ["accepted", "arriving", "arrived", "in_progress"].includes(trip.status);
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    if (!driverId || !tripActive) {
+      setDriverLocation(null);
+      return;
+    }
+    // Lấy vị trí hiện có ngay, rồi nghe cập nhật realtime sau đó.
+    getDriverLocation(driverId)
+      .then((loc) => loc && setDriverLocation({ lat: loc.lat, lng: loc.lng }))
+      .catch(() => {});
+    return subscribeDriverLocation(driverId, (loc) =>
+      setDriverLocation({ lat: loc.lat, lng: loc.lng }),
+    );
+  }, [driverId, tripActive]);
 
   useEffect(() => {
     if (trip?.status === "searching") {
@@ -114,7 +138,21 @@ function RealBookingDetail({ id }: { id: string }) {
 
   return (
     <div className="relative mx-auto min-h-screen max-w-md bg-background">
-      <MapPreview className="h-[55vh] w-full" showRoute driverPin />
+      <GoongMap
+        className="h-[55vh] w-full"
+        pickup={
+          trip.pickup_lat != null && trip.pickup_lng != null
+            ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+            : null
+        }
+        dropoff={
+          trip.dropoff_lat != null && trip.dropoff_lng != null
+            ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
+            : null
+        }
+        driver={driverLocation}
+        fallbackProps={{ showRoute: true, driverPin: true }}
+      />
 
       <div className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-5 py-3">
         <button
