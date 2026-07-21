@@ -15,7 +15,7 @@
 -- ---------------------------------------------------------------------------
 update public.drivers d
 set current_trip_id = null,
-    status = case when d.online then 'online' else 'offline' end
+    status = case when d.online then 'online' else 'offline' end::driver_status
 where d.current_trip_id is not null
   and exists (
     select 1 from public.trips t
@@ -39,7 +39,7 @@ begin
      and new.driver_id is not null then
     update public.drivers
     set current_trip_id = null,
-        status = case when online then 'online' else 'offline' end
+        status = case when online then 'online' else 'offline' end::driver_status
     where id = new.driver_id and current_trip_id = new.id;
 
     if found then
