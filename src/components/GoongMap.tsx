@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { LocateFixed } from "lucide-react";
 import { MapPreview } from "@/components/MapPreview";
 import {
   computeBearing,
@@ -44,6 +45,16 @@ export function GoongMap({
   const readyRef = useRef(false);
   const prevDriverRef = useRef<Coord | null>(null);
   const bearingRef = useRef(0);
+  const driverRef = useRef<Coord | null | undefined>(driver);
+  driverRef.current = driver;
+
+  // Chế độ dẫn đường: camera tự bám vị trí xe (mặc định) cho tới khi người
+  // dùng tự kéo/vuốt bản đồ — lúc đó ngừng bám để họ xem tự do, nút định vị
+  // chuyển màu xám; bấm nút sẽ khoá camera trở lại vị trí xe.
+  const [autoTracking, setAutoTracking] = useState(true);
+  useEffect(() => {
+    if (navigate) setAutoTracking(true);
+  }, [navigate]);
 
   // Khởi tạo bản đồ 1 lần.
   useEffect(() => {
@@ -63,6 +74,16 @@ export function GoongMap({
         map.on("load", () => {
           readyRef.current = true;
           syncMap(goongjs, map);
+        });
+        // "dragstart" chỉ bắn khi người dùng tự kéo bản đồ (easeTo/flyTo do
+        // code gọi không kích hoạt sự kiện này). zoomstart/rotatestart thì có
+        // bắn cho cả 2 trường hợp nên phải kiểm tra originalEvent để phân biệt.
+        map.on("dragstart", () => setAutoTracking(false));
+        map.on("zoomstart", (e) => {
+          if (e.originalEvent) setAutoTracking(false);
+        });
+        map.on("rotatestart", (e) => {
+          if (e.originalEvent) setAutoTracking(false);
         });
         mapRef.current = map;
       })
@@ -104,6 +125,7 @@ export function GoongMap({
     driver?.lng,
     routePolyline,
     navigate,
+    autoTracking,
   ]);
 
   function syncMap(goongjs: NonNullable<typeof window.goongjs>, map: GoongMapInstance) {
@@ -130,9 +152,9 @@ export function GoongMap({
     if (routePolyline) drawRoute(map, routePolyline);
 
     if (navigate && driver) {
-      // Chế độ dẫn đường: camera khoá theo vị trí tài xế, nghiêng + xoay theo
-      // hướng di chuyển — chỉ tính lại hướng khi đã đi đủ xa (~8m) so với lần
-      // trước, tránh camera rung khi GPS nhiễu lúc xe gần như đứng yên.
+      // Luôn cập nhật hướng di chuyển (kể cả lúc không tự bám) để nút định vị
+      // luôn xoay camera đúng hướng xe ngay khi bấm — chỉ tính lại khi đã đi
+      // đủ xa (~8m) so với lần trước, tránh hướng bị nhiễu lúc gần như đứng yên.
       const prev = prevDriverRef.current;
       if (prev) {
         const movedM = Math.hypot(driver.lat - prev.lat, driver.lng - prev.lng) * 111_000; // ước lượng nhanh, đủ dùng để so ngưỡng
@@ -143,13 +165,17 @@ export function GoongMap({
       } else {
         prevDriverRef.current = driver;
       }
-      map.easeTo({
-        center: [driver.lng, driver.lat],
-        zoom: 17,
-        pitch: 55,
-        bearing: bearingRef.current,
-        duration: 900,
-      });
+      // Chỉ tự kéo camera theo xe khi đang bật auto-tracking — người dùng đang
+      // xem tự do (đã kéo/vuốt bản đồ) thì để yên cho tới khi họ bấm nút định vị.
+      if (autoTracking) {
+        map.easeTo({
+          center: [driver.lng, driver.lat],
+          zoom: 17,
+          pitch: 55,
+          bearing: bearingRef.current,
+          duration: 900,
+        });
+      }
       return;
     }
 
@@ -200,10 +226,51 @@ export function GoongMap({
     }
   }
 
+  // Kéo camera mượt về lại vị trí xe, xoay theo hướng đang di chuyển, rồi bật
+  // lại auto-tracking. Dùng flyTo (mượt/uốn cong hơn easeTo) vì đây là hành
+  // động 1 lần theo yêu cầu người dùng, không phải cập nhật liên tục mỗi nhịp GPS.
+  const handleRecenter = () => {
+    const map = mapRef.current;
+    const pos = driverRef.current;
+    if (!map || !pos) return;
+    map.flyTo({
+      center: [pos.lng, pos.lat],
+      zoom: 17,
+      pitch: 55,
+      bearing: bearingRef.current,
+      duration: 900,
+    });
+    setAutoTracking(true);
+  };
+
   // Chưa cấu hình Maptiles key → dùng bản đồ tĩnh cũ để giao diện không trống.
   if (!isGoongMapConfigured) {
     return <MapPreview className={className} {...fallbackProps} />;
   }
 
-  return <div ref={containerRef} className={cn("bg-muted", className)} />;
+  const mapEl = <div ref={containerRef} className={cn("bg-muted", className)} />;
+  if (!navigate) return mapEl;
+
+  return (
+    // className (vị trí/kích thước bản đồ) đã nằm trên mapEl bên trong; wrapper
+    // này chỉ cần lấp đầy đúng chỗ đó để làm điểm neo cho nút định vị — dùng
+    // style trực tiếp thay vì class Tailwind để tránh twMerge xung đột với các
+    // class position (absolute/relative) mà caller đã đặt trên mapEl.
+    <div style={{ position: "relative", height: "100%", width: "100%" }}>
+      {mapEl}
+      <button
+        type="button"
+        onClick={handleRecenter}
+        aria-label={autoTracking ? "Đang bám theo vị trí xe" : "Về lại vị trí xe"}
+        className={cn(
+          "absolute bottom-28 right-4 z-10 grid h-12 w-12 place-items-center rounded-full shadow-elevated transition-colors active:scale-95",
+          autoTracking
+            ? "gradient-primary text-primary-foreground"
+            : "bg-surface text-muted-foreground",
+        )}
+      >
+        <LocateFixed className="h-5 w-5" />
+      </button>
+    </div>
+  );
 }

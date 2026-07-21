@@ -17,9 +17,15 @@ export interface GoongMarker {
   remove(): void;
 }
 
+export interface GoongMapEvent {
+  // Chỉ có khi sự kiện bắt nguồn từ thao tác thật của người dùng (kéo/chạm/lăn
+  // chuột) — easeTo/flyTo do code gọi thì không có, dùng để phân biệt 2 loại.
+  originalEvent?: unknown;
+}
+
 export interface GoongMapInstance {
-  on(event: string, cb: () => void): void;
-  once(event: string, cb: () => void): void;
+  on(event: string, cb: (e: GoongMapEvent) => void): void;
+  once(event: string, cb: (e: GoongMapEvent) => void): void;
   remove(): void;
   addSource(id: string, source: unknown): void;
   addLayer(layer: unknown): void;
@@ -29,6 +35,7 @@ export interface GoongMapInstance {
   removeSource(id: string): void;
   fitBounds(bounds: unknown, options?: unknown): void;
   easeTo(options: Record<string, unknown>): void;
+  flyTo(options: Record<string, unknown>): void;
   isStyleLoaded(): boolean;
 }
 
