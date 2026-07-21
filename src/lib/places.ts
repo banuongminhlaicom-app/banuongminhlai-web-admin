@@ -186,7 +186,9 @@ export function getCurrentPosition(): Promise<{ lat: number; lng: number }> {
   });
 }
 
-function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+// Đường chim bay giữa 2 toạ độ — dùng riêng, không tốn API, để tính khoảng
+// cách còn lại "sống" theo từng nhịp GPS mà không phải gọi lại Directions.
+export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
   const dLng = ((b.lng - a.lng) * Math.PI) / 180;

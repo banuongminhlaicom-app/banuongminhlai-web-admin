@@ -10,9 +10,18 @@ const MIN_INTERVAL_MS = 8000;
 /**
  * Theo dõi GPS của tài xế và gửi lên server khi `active` = true.
  * Tự dừng khi tài xế offline / không có chuyến để tiết kiệm pin và băng thông.
+ *
+ * `onPosition` (tuỳ chọn) bắn ở MỖI lần GPS đọc được, tách biệt với việc gửi
+ * server (vẫn throttle 25m/8s như cũ) — dùng để hiển thị khoảng cách/ETA
+ * "sống" ngay trên máy tài xế mà không cần đợi vòng round-trip lên database.
  */
-export function useLocationTracking(active: boolean) {
+export function useLocationTracking(
+  active: boolean,
+  onPosition?: (pos: { lat: number; lng: number }) => void,
+) {
   const lastSentRef = useRef<{ lat: number; lng: number; at: number } | null>(null);
+  const onPositionRef = useRef(onPosition);
+  onPositionRef.current = onPosition;
 
   useEffect(() => {
     if (!active) return;
@@ -22,6 +31,8 @@ export function useLocationTracking(active: boolean) {
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
+        onPositionRef.current?.({ lat, lng });
+
         const now = Date.now();
         const last = lastSentRef.current;
 
@@ -44,6 +55,8 @@ export function useLocationTracking(active: boolean) {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
+    // onPosition cố ý không nằm trong deps: dùng ref để tránh việc component
+    // cha truyền hàm mới mỗi lần render làm watchPosition bị khởi động lại.
   }, [active]);
 }
 

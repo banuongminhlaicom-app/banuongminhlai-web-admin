@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import { useLocationTracking } from "@/hooks/use-location-tracking";
 import { GoongMap } from "@/components/GoongMap";
-import { fetchRoute } from "@/lib/places";
+import { fetchRoute, haversineKm } from "@/lib/places";
 import { useAuthState, useRequireRole } from "@/lib/auth";
 import {
   completeDriverTrip,
@@ -89,10 +89,28 @@ function DriverTripDetail() {
   const elapsed = useElapsed(driverStatus === "in_progress" ? startedAtMs : null);
 
   // Bám vị trí GPS suốt chuyến (từ lúc đi đón tới lúc trả khách) để khách theo
-  // dõi được xe trên bản đồ. Dừng ngay khi chuyến kết thúc.
+  // dõi được xe trên bản đồ. Dừng ngay khi chuyến kết thúc. onPosition cập
+  // nhật vị trí tại chỗ (không tốn API) để tự tính khoảng cách/ETA còn lại.
+  const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
   useLocationTracking(
     driverStatus != null && driverStatus !== "offline" && driverStatus !== "completed",
+    setLivePos,
   );
+
+  // Điểm đang hướng tới: điểm đón khi chưa gặp khách, điểm trả khi đang chở khách.
+  const targetCoord =
+    driverStatus === "in_progress"
+      ? trip?.dropoff_lat != null && trip?.dropoff_lng != null
+        ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
+        : null
+      : trip?.pickup_lat != null && trip?.pickup_lng != null
+        ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+        : null;
+
+  // Khoảng cách còn lại tính bằng đường chim bay × 1.3 (hệ số đường bộ, cùng
+  // công thức dự phòng của fetchRoute) — không gọi lại Directions API, chỉ
+  // dùng vị trí GPS mới nhất nên cập nhật tức thì theo từng nhịp di chuyển.
+  const remaining = livePos && targetCoord ? { km: haversineKm(livePos, targetCoord) * 1.3 } : null;
 
   // Tuyến đường điểm đón -> điểm đến để vẽ lên bản đồ (gọi 1 lần, tuyến cố định).
   const { data: route } = useQuery({
@@ -209,7 +227,9 @@ function DriverTripDetail() {
                       : "Chuẩn bị lên đường"}
             </span>
             <span className="text-muted-foreground">
-              ETA {formatMinutes(driverStatus === "in_progress" ? 12 : 4)}
+              {remaining
+                ? `Còn ${formatKm(remaining.km)} · ${formatMinutes((remaining.km / 30) * 60)}`
+                : "Đang định vị…"}
             </span>
           </div>
         </div>
@@ -284,6 +304,10 @@ function DriverTripDetail() {
             lat={driverStatus === "in_progress" ? trip.dropoff_lat : trip.pickup_lat}
             lng={driverStatus === "in_progress" ? trip.dropoff_lng : trip.pickup_lng}
           />
+          <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+            Bản đồ trong app đã có sẵn tuyến đường — rời sang Google Maps sẽ tạm ngừng cập nhật vị
+            trí cho khách theo dõi.
+          </p>
 
           {trip.note && (
             <div className="mt-3 flex items-center justify-between rounded-2xl bg-background/60 p-3 text-xs">
