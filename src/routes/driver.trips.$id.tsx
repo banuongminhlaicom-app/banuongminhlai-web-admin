@@ -4,10 +4,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowUp,
+  CornerUpLeft,
+  CornerUpRight,
   Loader2,
   MessageSquare,
-  Navigation,
   Phone,
+  Redo2,
+  Undo2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -107,32 +111,51 @@ function DriverTripDetail() {
         ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
         : null;
 
-  // Khoảng cách còn lại tính bằng đường chim bay × 1.3 (hệ số đường bộ, cùng
-  // công thức dự phòng của fetchRoute) — không gọi lại Directions API, chỉ
-  // dùng vị trí GPS mới nhất nên cập nhật tức thì theo từng nhịp di chuyển.
-  const remaining = livePos && targetCoord ? { km: haversineKm(livePos, targetCoord) * 1.3 } : null;
+  // Chốt lại điểm gốc để tính tuyến — chỉ dời điểm gốc khi tài xế đã đi xa hơn
+  // 50m so với lần tính trước, tránh gọi lại Directions API theo từng nhịp GPS
+  // (route đã có cache 10 phút + rate limit ở places.ts, đây là lớp giảm tải thêm).
+  const [routeOrigin, setRouteOrigin] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (!livePos) return;
+    if (!routeOrigin || haversineKm(routeOrigin, livePos) > 0.05) {
+      setRouteOrigin(livePos);
+    }
+  }, [livePos, routeOrigin]);
 
-  // Tuyến đường điểm đón -> điểm đến để vẽ lên bản đồ (gọi 1 lần, tuyến cố định).
-  const { data: route } = useQuery({
-    queryKey: [
-      "trip-route",
-      trip?.pickup_lat,
-      trip?.pickup_lng,
-      trip?.dropoff_lat,
-      trip?.dropoff_lng,
-    ],
-    queryFn: () =>
-      fetchRoute(
-        { lat: trip!.pickup_lat!, lng: trip!.pickup_lng! },
-        { lat: trip!.dropoff_lat!, lng: trip!.dropoff_lng! },
-      ),
-    enabled:
-      trip?.pickup_lat != null &&
-      trip?.pickup_lng != null &&
-      trip?.dropoff_lat != null &&
-      trip?.dropoff_lng != null,
-    staleTime: Infinity,
+  // Tuyến đường sống: từ vị trí hiện tại của tài xế tới điểm đang hướng đến
+  // (điểm đón hoặc điểm trả) — vẽ lên bản đồ + dùng để chỉ đường từng bước.
+  const { data: liveRoute } = useQuery({
+    queryKey: ["nav-route", routeOrigin?.lat, routeOrigin?.lng, targetCoord?.lat, targetCoord?.lng],
+    queryFn: () => fetchRoute(routeOrigin!, targetCoord!),
+    enabled: !!routeOrigin && !!targetCoord,
+    staleTime: 60_000,
   });
+
+  // Chỉ đường từng bước theo tuyến vừa tính, tự chuyển sang bước kế khi tài xế
+  // tới gần điểm cuối của bước hiện tại. Không giọng nói — tài xế nhìn tuyến đã
+  // vẽ trên bản đồ + banner này để biết rẽ ở đâu, giống Grab nhưng không đọc.
+  const steps = liveRoute?.steps;
+  const [stepIndex, setStepIndex] = useState(0);
+  useEffect(() => setStepIndex(0), [steps]);
+  useEffect(() => {
+    const step = steps?.[stepIndex];
+    if (!livePos || !step || !steps) return;
+    if (haversineKm(livePos, step.end) * 1000 < 30 && stepIndex < steps.length - 1) {
+      setStepIndex((i) => i + 1);
+    }
+  }, [livePos, steps, stepIndex]);
+  const currentStep = steps?.[stepIndex] ?? null;
+  const stepDistanceM =
+    livePos && currentStep ? Math.round(haversineKm(livePos, currentStep.end) * 1000) : null;
+
+  // Khoảng cách còn lại tới đích: ưu tiên số liệu tuyến thật (đường bộ), rơi về
+  // đường chim bay × 1.3 nếu tuyến chưa tính xong.
+  const remaining =
+    liveRoute != null
+      ? { km: liveRoute.distanceKm }
+      : livePos && targetCoord
+        ? { km: haversineKm(livePos, targetCoord) * 1.3 }
+        : null;
 
   const cta = useMemo(() => {
     switch (driverStatus) {
@@ -199,7 +222,8 @@ function DriverTripDetail() {
               ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
               : null
           }
-          routePolyline={route?.polyline}
+          driver={livePos}
+          routePolyline={liveRoute?.polyline}
           fallbackProps={{ showRoute: true, driverPin: true }}
         />
         <div className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-5 py-3">
@@ -213,6 +237,21 @@ function DriverTripDetail() {
             {trip.code}
           </div>
         </div>
+        {currentStep && (
+          <div className="absolute inset-x-5 top-16 flex items-center gap-3 rounded-2xl bg-surface/95 px-3 py-2.5 shadow-elevated backdrop-blur">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+              <ManeuverIcon maneuver={currentStep.maneuver} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-bold">{currentStep.instruction}</div>
+              {stepDistanceM != null && (
+                <div className="text-[11px] text-muted-foreground">
+                  {stepDistanceM < 1000 ? `${stepDistanceM} m` : formatKm(stepDistanceM / 1000)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <div className="absolute inset-x-5 bottom-3 rounded-2xl bg-surface/95 px-3 py-2 text-xs backdrop-blur">
           <div className="flex items-center justify-between">
             <span className="font-bold">
@@ -292,22 +331,6 @@ function DriverTripDetail() {
               </div>
             </div>
           </div>
-
-          {/* Điều hướng: trước khi đón khách thì chỉ đường tới điểm đón, đang chở
-              khách thì chỉ đường tới điểm trả. Dùng link sâu mở app Google Maps
-              sẵn có trên máy tài xế — miễn phí, không cần API. */}
-          <NavigateButton
-            label={
-              driverStatus === "in_progress" ? "Chỉ đường tới điểm trả" : "Chỉ đường tới điểm đón"
-            }
-            address={driverStatus === "in_progress" ? trip.dropoff_address : trip.pickup_address}
-            lat={driverStatus === "in_progress" ? trip.dropoff_lat : trip.pickup_lat}
-            lng={driverStatus === "in_progress" ? trip.dropoff_lng : trip.pickup_lng}
-          />
-          <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
-            Bản đồ trong app đã có sẵn tuyến đường — rời sang Google Maps sẽ tạm ngừng cập nhật vị
-            trí cho khách theo dõi.
-          </p>
 
           {trip.note && (
             <div className="mt-3 flex items-center justify-between rounded-2xl bg-background/60 p-3 text-xs">
@@ -443,32 +466,25 @@ function ActionBtn({
   );
 }
 
-// Mở app Google Maps để chỉ đường. Ưu tiên toạ độ thật (chính xác hơn); nếu
-// chuyến chưa lưu toạ độ thì dùng địa chỉ dạng chữ để Google tự tìm.
-function NavigateButton({
-  label,
-  address,
-  lat,
-  lng,
-}: {
-  label: string;
-  address: string;
-  lat: number | null;
-  lng: number | null;
-}) {
-  const destination = lat != null && lng != null ? `${lat},${lng}` : address;
-  const href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3 text-sm font-bold text-primary-foreground shadow-glow transition active:scale-[.98]"
-    >
-      <Navigation className="h-4 w-4" />
-      {label}
-    </a>
-  );
+// Icon rẽ theo "maneuver" Goong trả về (left/right/slight left/straight/uturn...).
+// Chưa gặp loại nào thì rơi về mũi tên thẳng.
+function ManeuverIcon({ maneuver }: { maneuver: string | null }) {
+  switch (maneuver) {
+    case "left":
+    case "slight left":
+    case "sharp left":
+      return <CornerUpLeft className="h-5 w-5" />;
+    case "right":
+    case "slight right":
+    case "sharp right":
+      return <CornerUpRight className="h-5 w-5" />;
+    case "uturn-left":
+      return <Undo2 className="h-5 w-5" />;
+    case "uturn-right":
+      return <Redo2 className="h-5 w-5" />;
+    default:
+      return <ArrowUp className="h-5 w-5" />;
+  }
 }
 
 function Cell({ label, value }: { label: string; value: string }) {

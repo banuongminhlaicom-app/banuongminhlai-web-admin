@@ -95,12 +95,24 @@ async function resolvePlace(placeId: string, fallbackLabel: string) {
   }
 }
 
+export interface RouteStep {
+  // Goong trả sẵn tiếng Việt, dạng chữ thuần — vẫn strip thẻ HTML phòng khi có.
+  instruction: string;
+  maneuver: string | null;
+  end: { lat: number; lng: number };
+}
+
 // Tính khoảng cách + thời gian thật giữa 2 điểm (Goong Directions). Nếu Goong
 // lỗi mà vẫn có toạ độ thì ước lượng bằng đường chim bay × hệ số đường bộ.
 export async function fetchRoute(
   origin: { lat: number; lng: number },
   destination: { lat: number; lng: number },
-): Promise<{ distanceKm: number; durationMin: number; polyline?: string | null } | null> {
+): Promise<{
+  distanceKm: number;
+  durationMin: number;
+  polyline?: string | null;
+  steps?: RouteStep[];
+} | null> {
   if (isMapConfigured) {
     try {
       // Làm tròn toạ độ tới ~11m khi tạo key: GPS luôn nhiễu vài mét, nếu dùng
@@ -109,7 +121,15 @@ export async function fetchRoute(
       const data = await cachedFetch<{
         routes?: {
           overview_polyline?: { points?: string };
-          legs?: { distance?: { value: number }; duration?: { value: number } }[];
+          legs?: {
+            distance?: { value: number };
+            duration?: { value: number };
+            steps?: {
+              html_instructions?: string;
+              maneuver?: string;
+              end_location?: { lat: number; lng: number };
+            }[];
+          }[];
         }[];
       }>(`route:${k(origin)}>${k(destination)}`, TTL_ROUTE, async () => {
         if (!allowOtherApis()) throw new Error("Gọi Goong quá nhanh, bỏ qua lượt này.");
@@ -127,6 +147,13 @@ export async function fetchRoute(
           distanceKm: (leg.distance.value ?? 0) / 1000,
           durationMin: (leg.duration?.value ?? 0) / 60,
           polyline: route?.overview_polyline?.points ?? null,
+          steps: (leg.steps ?? [])
+            .filter((s) => s.end_location)
+            .map((s) => ({
+              instruction: (s.html_instructions ?? "").replace(/<[^>]+>/g, "").trim(),
+              maneuver: s.maneuver ?? null,
+              end: { lat: s.end_location!.lat, lng: s.end_location!.lng },
+            })),
         };
       }
     } catch {
