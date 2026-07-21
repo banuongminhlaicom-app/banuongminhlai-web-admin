@@ -45,8 +45,6 @@ export function GoongMap({
   const readyRef = useRef(false);
   const prevDriverRef = useRef<Coord | null>(null);
   const bearingRef = useRef(0);
-  const driverRef = useRef<Coord | null | undefined>(driver);
-  driverRef.current = driver;
 
   // Chế độ dẫn đường: camera tự bám vị trí xe (mặc định) cho tới khi người
   // dùng tự kéo/vuốt bản đồ — lúc đó ngừng bám để họ xem tự do, nút định vị
@@ -56,6 +54,15 @@ export function GoongMap({
     if (navigate) setAutoTracking(true);
   }, [navigate]);
 
+  // Mọi callback của bản đồ ("load", "dragstart") được đăng ký MỘT LẦN lúc dựng
+  // map, nên nếu đọc props trực tiếp chúng sẽ mãi thấy giá trị của lần render
+  // đầu tiên. Lần render đầu `navigate` luôn là false (driverStatus chưa kịp về
+  // từ useQuery), khiến callback "load" chạy nhánh fitBounds và ép camera về
+  // góc phẳng — đúng lỗi bản đồ không nghiêng 3D. Đọc qua ref để luôn lấy giá
+  // trị mới nhất.
+  const propsRef = useRef({ pickup, dropoff, driver, routePolyline, navigate, autoTracking });
+  propsRef.current = { pickup, dropoff, driver, routePolyline, navigate, autoTracking };
+
   // Khởi tạo bản đồ 1 lần.
   useEffect(() => {
     if (!isGoongMapConfigured || !containerRef.current) return;
@@ -64,15 +71,18 @@ export function GoongMap({
     loadGoongMapSdk()
       .then((goongjs) => {
         if (disposed || !containerRef.current) return;
-        const center = pickup ?? dropoff ?? { lat: 10.457, lng: 105.634 };
+        // Đọc từ ref: SDK tải bất đồng bộ nên tới đây `navigate` có thể đã bật
+        // (driverStatus vừa về) dù lúc mount còn tắt.
+        const p = propsRef.current;
+        const center = p.driver ?? p.pickup ?? p.dropoff ?? { lat: 10.457, lng: 105.634 };
         // Chế độ dẫn đường: vào thẳng góc nhìn 3D nghiêng/cận cảnh ngay từ đầu,
         // không đợi easeTo đầu tiên mới nghiêng lên (tránh khựng 2D rồi mới 3D).
         const map = new goongjs.Map({
           container: containerRef.current,
           style: MAP_STYLE,
           center: [center.lng, center.lat],
-          zoom: navigate ? 18 : 14,
-          pitch: navigate ? 60 : 0,
+          zoom: p.navigate ? 18 : 14,
+          pitch: p.navigate ? 60 : 0,
         });
         map.on("load", () => {
           readyRef.current = true;
@@ -104,16 +114,12 @@ export function GoongMap({
   }, []);
 
   // Cập nhật marker + tuyến đường mỗi khi toạ độ đổi (vd. xe tài xế di chuyển).
-  // Nếu bản đồ chưa sẵn sàng, hoãn tới sự kiện "load" — nếu bỏ qua luôn thì dữ
-  // liệu về sớm hơn bản đồ sẽ không bao giờ được vẽ.
+  // Bản đồ chưa dựng/chưa load xong thì bỏ qua an toàn: callback "load" ở trên
+  // sẽ tự sync bằng props mới nhất trong ref.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !window.goongjs) return;
     const g = window.goongjs;
-    if (!readyRef.current) {
-      map.once("load", () => syncMap(g, map));
-      return;
-    }
+    if (!map || !g || !readyRef.current) return;
     syncMap(g, map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -128,7 +134,36 @@ export function GoongMap({
     autoTracking,
   ]);
 
+  // Bật góc nhìn 3D ngay khi vào chế độ dẫn đường. Tách riêng khỏi effect trên
+  // vì effect đó chỉ chạy lại khi toạ độ đổi: tài xế đứng yên (chờ đèn đỏ, chờ
+  // khách) thì driver.lat/lng đứng im, nên nếu lần sync đầu lỡ nhịp — map dựng
+  // với pitch 0 lúc chưa bật dẫn đường và SDK còn đang tải — camera sẽ phẳng
+  // mãi không có gì kéo nghiêng lên nữa.
+  useEffect(() => {
+    if (!navigate) return;
+    const map = mapRef.current;
+    if (!map) return;
+    const tilt = () => {
+      const p = propsRef.current;
+      const focus = p.driver ?? p.pickup ?? p.dropoff;
+      if (!focus) return;
+      map.easeTo({
+        center: [focus.lng, focus.lat],
+        zoom: 18,
+        pitch: 60,
+        bearing: bearingRef.current,
+        duration: 600,
+      });
+    };
+    if (readyRef.current) tilt();
+    else map.once("load", tilt);
+  }, [navigate]);
+
   function syncMap(goongjs: NonNullable<typeof window.goongjs>, map: GoongMapInstance) {
+    // Luôn đọc props qua ref — hàm này còn được gọi từ callback "load" vốn giữ
+    // closure của lần render đầu tiên.
+    const { pickup, dropoff, driver, routePolyline, navigate, autoTracking } = propsRef.current;
+
     const put = (key: string, coord: Coord | null | undefined, color: string) => {
       if (!coord) {
         markersRef.current[key]?.remove();
@@ -152,12 +187,10 @@ export function GoongMap({
     if (routePolyline) drawRoute(map, routePolyline);
 
     if (navigate) {
-      // QUAN TRỌNG: ở chế độ dẫn đường, KHÔNG BAO GIỜ được rơi xuống fitBounds
-      // bên dưới — fitBounds luôn đưa camera về góc nhìn phẳng top-down, xoá
-      // mất pitch/bearing (đây chính là lý do bản đồ bị "phẳng lại" dù đã set
-      // pitch: 60 — driver GPS chưa kịp về nhưng pickup+dropoff đã có sẵn 2
-      // điểm nên nhánh cũ vẫn tính fitBounds như thường). Chưa có vị trí tài
-      // xế thì tạm lấy điểm đón/đến làm tâm, vẫn giữ nguyên góc nghiêng 3D.
+      // Ở chế độ dẫn đường không được rơi xuống fitBounds bên dưới: đo thực tế
+      // trên Goong JS thì fitBounds giữ nguyên pitch nhưng ép bearing về 0 và
+      // thu nhỏ zoom (18 -> ~13.7), tức mất hướng xe và mất luôn góc cận cảnh.
+      // Chưa có GPS tài xế thì tạm lấy điểm đón/đến làm tâm, vẫn giữ góc 3D.
       const focus = driver ?? pickup ?? dropoff;
       if (driver) {
         // Luôn cập nhật hướng di chuyển (kể cả lúc không tự bám) để nút định vị
@@ -240,7 +273,8 @@ export function GoongMap({
   // động 1 lần theo yêu cầu người dùng, không phải cập nhật liên tục mỗi nhịp GPS.
   const handleRecenter = () => {
     const map = mapRef.current;
-    const pos = driverRef.current;
+    const p = propsRef.current;
+    const pos = p.driver ?? p.pickup ?? p.dropoff;
     if (!map || !pos) return;
     map.flyTo({
       center: [pos.lng, pos.lat],
