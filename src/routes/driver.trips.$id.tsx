@@ -9,6 +9,7 @@ import {
   CornerUpRight,
   Loader2,
   MessageSquare,
+  Navigation,
   Phone,
   Redo2,
   Undo2,
@@ -332,6 +333,20 @@ function DriverTripDetail() {
             </div>
           </div>
 
+          {/* Bản đồ trong app đã tự vẽ tuyến + banner chỉ đường, nhưng tài xế vẫn có
+              thể mở Google Maps để dùng chỉ đường giọng nói/điều hướng đầy đủ. */}
+          <NavigateButton
+            label={
+              driverStatus === "in_progress" ? "Chỉ đường tới điểm trả" : "Chỉ đường tới điểm đón"
+            }
+            address={driverStatus === "in_progress" ? trip.dropoff_address : trip.pickup_address}
+            lat={driverStatus === "in_progress" ? trip.dropoff_lat : trip.pickup_lat}
+            lng={driverStatus === "in_progress" ? trip.dropoff_lng : trip.pickup_lng}
+          />
+          <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+            Rời sang Google Maps sẽ tạm ngừng cập nhật vị trí cho khách theo dõi.
+          </p>
+
           {trip.note && (
             <div className="mt-3 flex items-center justify-between rounded-2xl bg-background/60 p-3 text-xs">
               <span className="text-muted-foreground">Ghi chú của khách</span>
@@ -463,6 +478,34 @@ function ActionBtn({
       <Icon className="h-4 w-4 text-primary" />
       {label}
     </button>
+  );
+}
+
+// Mở app Google Maps để chỉ đường/điều hướng giọng nói đầy đủ. Ưu tiên toạ độ
+// thật (chính xác hơn); nếu chuyến chưa lưu toạ độ thì dùng địa chỉ dạng chữ.
+function NavigateButton({
+  label,
+  address,
+  lat,
+  lng,
+}: {
+  label: string;
+  address: string;
+  lat: number | null;
+  lng: number | null;
+}) {
+  const destination = lat != null && lng != null ? `${lat},${lng}` : address;
+  const href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3 text-sm font-bold text-primary-foreground shadow-glow transition active:scale-[.98]"
+    >
+      <Navigation className="h-4 w-4" />
+      {label}
+    </a>
   );
 }
 
