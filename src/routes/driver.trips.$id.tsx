@@ -284,30 +284,50 @@ function DriverTripDetail() {
         fallbackProps={{ showRoute: true, driverPin: true }}
       />
 
-      <div className="safe-top absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-3">
-        <button
-          onClick={() => navigate({ to: "/driver" })}
-          className="grid h-10 w-10 place-items-center rounded-full bg-surface/95 shadow-elevated backdrop-blur"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <div className="rounded-full bg-surface/95 px-3 py-1.5 text-xs font-bold shadow-elevated backdrop-blur">
-          {trip.code}
-        </div>
-      </div>
-
-      {currentStep && (
-        <div className="absolute inset-x-5 top-16 z-10 flex items-center gap-3 rounded-2xl bg-surface/95 px-3 py-2.5 shadow-elevated backdrop-blur">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-            <ManeuverIcon maneuver={currentStep.maneuver} />
+      {currentStep ? (
+        // Banner dẫn đường kiểu Grab/Google Maps: tối màu, ép sát cạnh trên
+        // cùng (không viền/bo góc nổi như thẻ trắng cũ), icon rẽ + khoảng cách
+        // to rõ + tên đường kế tiếp — đọc được nhanh khi đang lái.
+        <div className="safe-top absolute inset-x-0 top-0 z-10 bg-[#0b0f1a]/95 pb-3 shadow-elevated backdrop-blur">
+          <div className="flex items-center justify-between px-4 pt-3">
+            <button
+              onClick={() => navigate({ to: "/driver" })}
+              className="grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">
+              {trip.code}
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-bold">{currentStep.instruction}</div>
-            {stepDistanceM != null && (
-              <div className="text-[11px] text-muted-foreground">
-                {stepDistanceM < 1000 ? `${stepDistanceM} m` : formatKm(stepDistanceM / 1000)}
+          <div className="mt-2 flex items-center gap-3 px-4">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
+              <ManeuverIcon maneuver={currentStep.maneuver} className="h-7 w-7" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-2xl font-black leading-tight text-white">
+                {stepDistanceM != null
+                  ? stepDistanceM < 1000
+                    ? `${stepDistanceM} m`
+                    : formatKm(stepDistanceM / 1000)
+                  : "—"}
               </div>
-            )}
+              <div className="truncate text-sm font-medium text-white/70">
+                {currentStep.instruction}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="safe-top absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-3">
+          <button
+            onClick={() => navigate({ to: "/driver" })}
+            className="grid h-10 w-10 place-items-center rounded-full bg-surface/95 shadow-elevated backdrop-blur"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="rounded-full bg-surface/95 px-3 py-1.5 text-xs font-bold shadow-elevated backdrop-blur">
+            {trip.code}
           </div>
         </div>
       )}
@@ -552,22 +572,28 @@ function ActionBtn({
 
 // Icon rẽ theo "maneuver" Goong trả về (left/right/slight left/straight/uturn...).
 // Chưa gặp loại nào thì rơi về mũi tên thẳng.
-function ManeuverIcon({ maneuver }: { maneuver: string | null }) {
+function ManeuverIcon({
+  maneuver,
+  className = "h-5 w-5",
+}: {
+  maneuver: string | null;
+  className?: string;
+}) {
   switch (maneuver) {
     case "left":
     case "slight left":
     case "sharp left":
-      return <CornerUpLeft className="h-5 w-5" />;
+      return <CornerUpLeft className={className} />;
     case "right":
     case "slight right":
     case "sharp right":
-      return <CornerUpRight className="h-5 w-5" />;
+      return <CornerUpRight className={className} />;
     case "uturn-left":
-      return <Undo2 className="h-5 w-5" />;
+      return <Undo2 className={className} />;
     case "uturn-right":
-      return <Redo2 className="h-5 w-5" />;
+      return <Redo2 className={className} />;
     default:
-      return <ArrowUp className="h-5 w-5" />;
+      return <ArrowUp className={className} />;
   }
 }
 

@@ -65,11 +65,14 @@ export function GoongMap({
       .then((goongjs) => {
         if (disposed || !containerRef.current) return;
         const center = pickup ?? dropoff ?? { lat: 10.457, lng: 105.634 };
+        // Chế độ dẫn đường: vào thẳng góc nhìn 3D nghiêng/cận cảnh ngay từ đầu,
+        // không đợi easeTo đầu tiên mới nghiêng lên (tránh khựng 2D rồi mới 3D).
         const map = new goongjs.Map({
           container: containerRef.current,
           style: MAP_STYLE,
           center: [center.lng, center.lat],
-          zoom: 14,
+          zoom: navigate ? 18 : 14,
+          pitch: navigate ? 60 : 0,
         });
         map.on("load", () => {
           readyRef.current = true;
@@ -170,8 +173,8 @@ export function GoongMap({
       if (autoTracking) {
         map.easeTo({
           center: [driver.lng, driver.lat],
-          zoom: 17,
-          pitch: 55,
+          zoom: 18,
+          pitch: 60,
           bearing: bearingRef.current,
           duration: 900,
         });
@@ -235,8 +238,8 @@ export function GoongMap({
     if (!map || !pos) return;
     map.flyTo({
       center: [pos.lng, pos.lat],
-      zoom: 17,
-      pitch: 55,
+      zoom: 18,
+      pitch: 60,
       bearing: bearingRef.current,
       duration: 900,
     });
