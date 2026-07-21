@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { MapPreview } from "@/components/MapPreview";
 import {
+  computeBearing,
   decodePolyline,
   isGoongMapConfigured,
   loadGoongMapSdk,
@@ -24,6 +25,7 @@ export function GoongMap({
   dropoff,
   driver,
   routePolyline,
+  navigate,
   fallbackProps,
 }: {
   className?: string;
@@ -31,12 +33,17 @@ export function GoongMap({
   dropoff?: Coord | null;
   driver?: Coord | null;
   routePolyline?: string | null;
+  // Chế độ dẫn đường: camera nghiêng (pitch) + xoay theo hướng xe chạy (bearing),
+  // bám sát vị trí tài xế thay vì canh khung nhìn ôm trọn điểm đón/đến/xe.
+  navigate?: boolean;
   fallbackProps?: { showRoute?: boolean; driverPin?: boolean; showNearbyDrivers?: boolean };
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<GoongMapInstance | null>(null);
   const markersRef = useRef<Record<string, GoongMarker>>({});
   const readyRef = useRef(false);
+  const prevDriverRef = useRef<Coord | null>(null);
+  const bearingRef = useRef(0);
 
   // Khởi tạo bản đồ 1 lần.
   useEffect(() => {
@@ -96,6 +103,7 @@ export function GoongMap({
     driver?.lat,
     driver?.lng,
     routePolyline,
+    navigate,
   ]);
 
   function syncMap(goongjs: NonNullable<typeof window.goongjs>, map: GoongMapInstance) {
@@ -121,7 +129,31 @@ export function GoongMap({
 
     if (routePolyline) drawRoute(map, routePolyline);
 
-    // Căn khung nhìn ôm trọn các điểm đang có.
+    if (navigate && driver) {
+      // Chế độ dẫn đường: camera khoá theo vị trí tài xế, nghiêng + xoay theo
+      // hướng di chuyển — chỉ tính lại hướng khi đã đi đủ xa (~8m) so với lần
+      // trước, tránh camera rung khi GPS nhiễu lúc xe gần như đứng yên.
+      const prev = prevDriverRef.current;
+      if (prev) {
+        const movedM = Math.hypot(driver.lat - prev.lat, driver.lng - prev.lng) * 111_000; // ước lượng nhanh, đủ dùng để so ngưỡng
+        if (movedM > 8) {
+          bearingRef.current = computeBearing(prev, driver);
+          prevDriverRef.current = driver;
+        }
+      } else {
+        prevDriverRef.current = driver;
+      }
+      map.easeTo({
+        center: [driver.lng, driver.lat],
+        zoom: 17,
+        pitch: 55,
+        bearing: bearingRef.current,
+        duration: 900,
+      });
+      return;
+    }
+
+    // Chế độ thường: căn khung nhìn ôm trọn các điểm đang có.
     const points = [pickup, dropoff, driver].filter((c): c is Coord => !!c);
     if (points.length >= 2) {
       const bounds = new goongjs.LngLatBounds(

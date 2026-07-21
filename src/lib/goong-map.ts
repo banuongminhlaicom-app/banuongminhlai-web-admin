@@ -28,6 +28,7 @@ export interface GoongMapInstance {
   removeLayer(id: string): void;
   removeSource(id: string): void;
   fitBounds(bounds: unknown, options?: unknown): void;
+  easeTo(options: Record<string, unknown>): void;
   isStyleLoaded(): boolean;
 }
 
@@ -87,6 +88,21 @@ export function loadGoongMapSdk(): Promise<GoongJs> {
   });
 
   return loadPromise;
+}
+
+// Hướng di chuyển (độ, 0 = Bắc) giữa 2 toạ độ GPS liên tiếp — dùng để xoay
+// camera bám theo hướng xe chạy ở chế độ dẫn đường (giống Google Maps).
+export function computeBearing(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+): number {
+  const lat1 = (from.lat * Math.PI) / 180;
+  const lat2 = (to.lat * Math.PI) / 180;
+  const dLng = ((to.lng - from.lng) * Math.PI) / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  const deg = (Math.atan2(y, x) * 180) / Math.PI;
+  return (deg + 360) % 360;
 }
 
 // Giải mã chuỗi polyline (chuẩn Encoded Polyline của Google, Goong dùng chung)

@@ -1,15 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowUp,
+  ChevronUp,
   CornerUpLeft,
   CornerUpRight,
   Loader2,
   MessageSquare,
-  Navigation,
   Phone,
   Redo2,
   Undo2,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocationTracking } from "@/hooks/use-location-tracking";
+import { useWakeLock } from "@/hooks/use-wake-lock";
 import { GoongMap } from "@/components/GoongMap";
 import { fetchRoute, haversineKm } from "@/lib/places";
 import { useAuthState, useRequireRole } from "@/lib/auth";
@@ -34,6 +35,7 @@ import {
   type TripRow,
 } from "@/lib/queries";
 import { formatKm, formatMinutes, formatVND } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/driver/trips/$id")({
   head: () => ({ meta: [{ title: "Chuyến đi hiện tại" }] }),
@@ -93,14 +95,57 @@ function DriverTripDetail() {
   const startedAtMs = trip?.started_at ? new Date(trip.started_at).getTime() : null;
   const elapsed = useElapsed(driverStatus === "in_progress" ? startedAtMs : null);
 
+  const isOnTrip =
+    driverStatus != null && driverStatus !== "offline" && driverStatus !== "completed";
+  // Camera 3D bám theo hướng xe chạy chỉ bật lúc tài xế thực sự đang di chuyển
+  // tới 1 điểm cụ thể (đi đón / đang chở khách) — lúc chờ ở điểm đón thì không
+  // cần nghiêng/xoay camera liên tục.
+  const followCamera = driverStatus === "going_to_pickup" || driverStatus === "in_progress";
+
   // Bám vị trí GPS suốt chuyến (từ lúc đi đón tới lúc trả khách) để khách theo
   // dõi được xe trên bản đồ. Dừng ngay khi chuyến kết thúc. onPosition cập
   // nhật vị trí tại chỗ (không tốn API) để tự tính khoảng cách/ETA còn lại.
   const [livePos, setLivePos] = useState<{ lat: number; lng: number } | null>(null);
-  useLocationTracking(
-    driverStatus != null && driverStatus !== "offline" && driverStatus !== "completed",
-    setLivePos,
-  );
+  useLocationTracking(isOnTrip, setLivePos);
+
+  // Giữ màn hình luôn sáng khi đang chạy chuyến — điện thoại tự tắt màn hình
+  // sẽ khiến trình duyệt ngưng luôn GPS, làm khách mất theo dõi vị trí.
+  useWakeLock(isOnTrip);
+
+  // Cảnh báo nếu tài xế ẩn trình duyệt (chuyển app khác) rồi quay lại giữa lúc
+  // đang chạy chuyến — GPS có thể đã bị hệ điều hành tạm ngưng trong lúc đó.
+  useEffect(() => {
+    if (!isOnTrip) return;
+    let wasHidden = false;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        wasHidden = true;
+      } else if (wasHidden) {
+        wasHidden = false;
+        toast.warning(
+          "Việc ẩn trình duyệt có thể làm gián đoạn chuyến đi và GPS. Vui lòng giữ màn hình luôn mở.",
+          { duration: 6000 },
+        );
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [isOnTrip]);
+
+  // Bottom sheet thu gọn/mở rộng: bấm vào tay cầm hoặc vuốt lên/xuống trên đó.
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetTouchStartYRef = useRef<number | null>(null);
+  const onSheetTouchStart = (e: React.TouchEvent) => {
+    sheetTouchStartYRef.current = e.touches[0]?.clientY ?? null;
+  };
+  const onSheetTouchEnd = (e: React.TouchEvent) => {
+    const startY = sheetTouchStartYRef.current;
+    sheetTouchStartYRef.current = null;
+    if (startY == null) return;
+    const deltaY = (e.changedTouches[0]?.clientY ?? startY) - startY;
+    if (deltaY < -24) setSheetExpanded(true);
+    else if (deltaY > 24) setSheetExpanded(false);
+  };
 
   // Điểm đang hướng tới: điểm đón khi chưa gặp khách, điểm trả khi đang chở khách.
   const targetCoord =
@@ -208,214 +253,238 @@ function DriverTripDetail() {
     driverStatus ?? "",
   );
 
+  const statusText =
+    driverStatus === "in_progress"
+      ? "Đang đưa khách về điểm đến"
+      : driverStatus === "going_to_pickup"
+        ? "Đang đến điểm đón khách"
+        : driverStatus === "arrived"
+          ? "Đã tới điểm đón"
+          : driverStatus === "met_customer"
+            ? "Đã gặp khách — chờ PIN"
+            : "Chuẩn bị lên đường";
+
   return (
-    <div className="mx-auto min-h-[100dvh] max-w-md bg-background pb-10">
-      <div className="relative">
-        <GoongMap
-          className="h-72 w-full"
-          pickup={
-            trip.pickup_lat != null && trip.pickup_lng != null
-              ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
-              : null
-          }
-          dropoff={
-            trip.dropoff_lat != null && trip.dropoff_lng != null
-              ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
-              : null
-          }
-          driver={livePos}
-          routePolyline={liveRoute?.polyline}
-          fallbackProps={{ showRoute: true, driverPin: true }}
-        />
-        <div className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-5 py-3">
-          <button
-            onClick={() => navigate({ to: "/driver" })}
-            className="grid h-10 w-10 place-items-center rounded-full bg-surface/95 backdrop-blur"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="rounded-full bg-surface/95 px-3 py-1.5 text-xs font-bold backdrop-blur">
-            {trip.code}
+    <div className="fixed inset-0 mx-auto max-w-md bg-background">
+      <GoongMap
+        className="absolute inset-0 h-full w-full"
+        pickup={
+          trip.pickup_lat != null && trip.pickup_lng != null
+            ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+            : null
+        }
+        dropoff={
+          trip.dropoff_lat != null && trip.dropoff_lng != null
+            ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
+            : null
+        }
+        driver={livePos}
+        routePolyline={liveRoute?.polyline}
+        navigate={followCamera}
+        fallbackProps={{ showRoute: true, driverPin: true }}
+      />
+
+      <div className="safe-top absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-3">
+        <button
+          onClick={() => navigate({ to: "/driver" })}
+          className="grid h-10 w-10 place-items-center rounded-full bg-surface/95 shadow-elevated backdrop-blur"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <div className="rounded-full bg-surface/95 px-3 py-1.5 text-xs font-bold shadow-elevated backdrop-blur">
+          {trip.code}
+        </div>
+      </div>
+
+      {currentStep && (
+        <div className="absolute inset-x-5 top-16 z-10 flex items-center gap-3 rounded-2xl bg-surface/95 px-3 py-2.5 shadow-elevated backdrop-blur">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
+            <ManeuverIcon maneuver={currentStep.maneuver} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-bold">{currentStep.instruction}</div>
+            {stepDistanceM != null && (
+              <div className="text-[11px] text-muted-foreground">
+                {stepDistanceM < 1000 ? `${stepDistanceM} m` : formatKm(stepDistanceM / 1000)}
+              </div>
+            )}
           </div>
         </div>
-        {currentStep && (
-          <div className="absolute inset-x-5 top-16 flex items-center gap-3 rounded-2xl bg-surface/95 px-3 py-2.5 shadow-elevated backdrop-blur">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/15 text-primary">
-              <ManeuverIcon maneuver={currentStep.maneuver} />
-            </div>
+      )}
+
+      {/* Bottom sheet: thu gọn chỉ còn ETA + nút thao tác chính, vuốt lên/bấm
+          vào tay cầm để xem chi tiết đơn (khách hàng, địa chỉ, giá...). */}
+      <div className="safe-bottom absolute inset-x-0 bottom-0 z-20">
+        <div className="rounded-t-3xl bg-background shadow-elevated">
+          <button
+            type="button"
+            onClick={() => setSheetExpanded((v) => !v)}
+            onTouchStart={onSheetTouchStart}
+            onTouchEnd={onSheetTouchEnd}
+            className="flex w-full items-center justify-center pt-2 pb-1"
+            aria-label={sheetExpanded ? "Thu gọn chi tiết chuyến" : "Xem chi tiết chuyến"}
+          >
+            <span className="h-1.5 w-10 rounded-full bg-muted" />
+          </button>
+
+          <div className="flex items-center gap-3 px-5 pb-3">
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-bold">{currentStep.instruction}</div>
-              {stepDistanceM != null && (
-                <div className="text-[11px] text-muted-foreground">
-                  {stepDistanceM < 1000 ? `${stepDistanceM} m` : formatKm(stepDistanceM / 1000)}
+              <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                {statusText}
+                <ChevronUp
+                  className={cn(
+                    "h-3 w-3 shrink-0 transition-transform",
+                    sheetExpanded && "rotate-180",
+                  )}
+                />
+              </div>
+              <div className="text-sm font-black">
+                {remaining
+                  ? `Còn ${formatKm(remaining.km)} · ${formatMinutes((remaining.km / 30) * 60)}`
+                  : "Đang định vị…"}
+              </div>
+            </div>
+            {cta && (
+              <button
+                onClick={handleCta}
+                className="shrink-0 rounded-2xl gradient-primary px-5 py-3 text-xs font-black uppercase tracking-wide text-primary-foreground shadow-glow"
+              >
+                {cta.label}
+              </button>
+            )}
+          </div>
+
+          <div
+            className={cn(
+              "overflow-hidden transition-[max-height] duration-300 ease-out",
+              sheetExpanded ? "max-h-[65vh] overflow-y-auto" : "max-h-0",
+            )}
+          >
+            <div className="space-y-3 px-5 pb-6">
+              <div className="rounded-3xl bg-surface p-4">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-background text-lg font-black text-primary">
+                    {(customer?.full_name ?? "Khách hàng")
+                      .split(" ")
+                      .slice(-2)
+                      .map((w) => w[0])
+                      .join("")}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold">{customer?.full_name ?? "Khách hàng"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {customer?.phone ? maskPhone(customer.phone) : "Chưa có số điện thoại"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => toast("Đang gọi khách...")}
+                    className="grid h-10 w-10 place-items-center rounded-full bg-success/20 text-success"
+                    aria-label="Gọi khách"
+                  >
+                    <Phone className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => toast("Mở khung chat")}
+                    className="grid h-10 w-10 place-items-center rounded-full bg-background"
+                    aria-label="Nhắn tin"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-3 border-t border-border/60 pt-3 text-center text-[11px]">
+                  <Cell label="Xe khách" value={trip.vehicle_type} />
+                </div>
+              </div>
+
+              <div className="rounded-3xl bg-surface p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 flex flex-col items-center gap-1">
+                    <div className="h-2.5 w-2.5 rounded-full bg-primary" />
+                    <div className="h-10 w-px bg-border" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-success" />
+                  </div>
+                  <div className="flex-1 space-y-3 text-xs">
+                    <div>
+                      <div className="text-[10px] uppercase text-muted-foreground">Điểm đón</div>
+                      <div className="text-sm font-bold">{trip.pickup_address}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase text-muted-foreground">
+                        Điểm đến · {trip.distance_km != null ? formatKm(trip.distance_km) : "—"}
+                      </div>
+                      <div className="text-sm font-bold">{trip.dropoff_address}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {trip.note && (
+                  <div className="mt-3 flex items-center justify-between rounded-2xl bg-background/60 p-3 text-xs">
+                    <span className="text-muted-foreground">Ghi chú của khách</span>
+                    <span className="ml-2 text-right font-semibold text-foreground">
+                      {trip.note}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-3 flex items-center justify-between rounded-2xl bg-primary/10 p-3">
+                  <span className="text-xs text-muted-foreground">Giá chuyến</span>
+                  <span className="text-lg font-black text-primary">{formatVND(trip.price)}</span>
+                </div>
+              </div>
+
+              {driverStatus === "in_progress" && (
+                <div className="grid grid-cols-2 gap-2 rounded-3xl bg-surface p-4 text-center text-xs">
+                  <div>
+                    <div className="text-muted-foreground">Đã đi</div>
+                    <div className="mt-1 text-lg font-black">{elapsed}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Quãng đường</div>
+                    <div className="mt-1 text-lg font-black">
+                      {trip.distance_km != null ? formatKm(trip.distance_km) : "—"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <ActionBtn
+                  label="Báo sự cố"
+                  Icon={AlertTriangle}
+                  onClick={() => setIssueOpen(true)}
+                />
+                <ActionBtn
+                  label="Hỗ trợ"
+                  Icon={Phone}
+                  onClick={() => toast("Đang kết nối tổng đài...")}
+                />
+              </div>
+
+              {driverStatus !== "in_progress" && (
+                <div className="rounded-3xl bg-surface p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                    Tiến trình
+                  </div>
+                  <ol className="grid grid-cols-4 gap-1 text-[10px]">
+                    {["Đi đón", "Đã tới", "Gặp khách", "Chở khách"].map((step, i) => (
+                      <li
+                        key={step}
+                        className={`rounded-lg py-2 text-center font-bold ${
+                          i <= progress
+                            ? "gradient-primary text-primary-foreground shadow-glow"
+                            : "bg-background text-muted-foreground"
+                        }`}
+                      >
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               )}
             </div>
           </div>
-        )}
-        <div className="absolute inset-x-5 bottom-3 rounded-2xl bg-surface/95 px-3 py-2 text-xs backdrop-blur">
-          <div className="flex items-center justify-between">
-            <span className="font-bold">
-              {driverStatus === "in_progress"
-                ? "Đang đưa khách về điểm đến"
-                : driverStatus === "going_to_pickup"
-                  ? "Đang đến điểm đón khách"
-                  : driverStatus === "arrived"
-                    ? "Đã tới điểm đón"
-                    : driverStatus === "met_customer"
-                      ? "Đã gặp khách — chờ PIN"
-                      : "Chuẩn bị lên đường"}
-            </span>
-            <span className="text-muted-foreground">
-              {remaining
-                ? `Còn ${formatKm(remaining.km)} · ${formatMinutes((remaining.km / 30) * 60)}`
-                : "Đang định vị…"}
-            </span>
-          </div>
         </div>
-      </div>
-
-      <div className="-mt-4 space-y-3 rounded-t-3xl bg-background px-5 pt-5">
-        <div className="rounded-3xl bg-surface p-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-background text-lg font-black text-primary">
-              {(customer?.full_name ?? "Khách hàng")
-                .split(" ")
-                .slice(-2)
-                .map((w) => w[0])
-                .join("")}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="font-bold">{customer?.full_name ?? "Khách hàng"}</div>
-              <div className="text-xs text-muted-foreground">
-                {customer?.phone ? maskPhone(customer.phone) : "Chưa có số điện thoại"}
-              </div>
-            </div>
-            <button
-              onClick={() => toast("Đang gọi khách...")}
-              className="grid h-10 w-10 place-items-center rounded-full bg-success/20 text-success"
-              aria-label="Gọi khách"
-            >
-              <Phone className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => toast("Mở khung chat")}
-              className="grid h-10 w-10 place-items-center rounded-full bg-background"
-              aria-label="Nhắn tin"
-            >
-              <MessageSquare className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mt-3 border-t border-border/60 pt-3 text-center text-[11px]">
-            <Cell label="Xe khách" value={trip.vehicle_type} />
-          </div>
-        </div>
-
-        <div className="rounded-3xl bg-surface p-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-1 flex flex-col items-center gap-1">
-              <div className="h-2.5 w-2.5 rounded-full bg-primary" />
-              <div className="h-10 w-px bg-border" />
-              <div className="h-2.5 w-2.5 rounded-full bg-success" />
-            </div>
-            <div className="flex-1 space-y-3 text-xs">
-              <div>
-                <div className="text-[10px] uppercase text-muted-foreground">Điểm đón</div>
-                <div className="text-sm font-bold">{trip.pickup_address}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase text-muted-foreground">
-                  Điểm đến · {trip.distance_km != null ? formatKm(trip.distance_km) : "—"}
-                </div>
-                <div className="text-sm font-bold">{trip.dropoff_address}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bản đồ trong app đã tự vẽ tuyến + banner chỉ đường, nhưng tài xế vẫn có
-              thể mở Google Maps để dùng chỉ đường giọng nói/điều hướng đầy đủ. */}
-          <NavigateButton
-            label={
-              driverStatus === "in_progress" ? "Chỉ đường tới điểm trả" : "Chỉ đường tới điểm đón"
-            }
-            address={driverStatus === "in_progress" ? trip.dropoff_address : trip.pickup_address}
-            lat={driverStatus === "in_progress" ? trip.dropoff_lat : trip.pickup_lat}
-            lng={driverStatus === "in_progress" ? trip.dropoff_lng : trip.pickup_lng}
-          />
-          <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
-            Rời sang Google Maps sẽ tạm ngừng cập nhật vị trí cho khách theo dõi.
-          </p>
-
-          {trip.note && (
-            <div className="mt-3 flex items-center justify-between rounded-2xl bg-background/60 p-3 text-xs">
-              <span className="text-muted-foreground">Ghi chú của khách</span>
-              <span className="ml-2 text-right font-semibold text-foreground">{trip.note}</span>
-            </div>
-          )}
-
-          <div className="mt-3 flex items-center justify-between rounded-2xl bg-primary/10 p-3">
-            <span className="text-xs text-muted-foreground">Giá chuyến</span>
-            <span className="text-lg font-black text-primary">{formatVND(trip.price)}</span>
-          </div>
-        </div>
-
-        {driverStatus === "in_progress" && (
-          <div className="grid grid-cols-2 gap-2 rounded-3xl bg-surface p-4 text-center text-xs">
-            <div>
-              <div className="text-muted-foreground">Đã đi</div>
-              <div className="mt-1 text-lg font-black">{elapsed}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Quãng đường</div>
-              <div className="mt-1 text-lg font-black">
-                {trip.distance_km != null ? formatKm(trip.distance_km) : "—"}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Đã có nút "Chỉ đường" thật (mở Google Maps) ở khối địa chỉ phía trên
-            nên bỏ nút chỉ đường giả ở đây, tránh trùng lặp. */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <ActionBtn label="Báo sự cố" Icon={AlertTriangle} onClick={() => setIssueOpen(true)} />
-          <ActionBtn
-            label="Hỗ trợ"
-            Icon={Phone}
-            onClick={() => toast("Đang kết nối tổng đài...")}
-          />
-        </div>
-
-        {driverStatus !== "in_progress" && (
-          <div className="rounded-3xl bg-surface p-3">
-            <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-              Tiến trình
-            </div>
-            <ol className="grid grid-cols-4 gap-1 text-[10px]">
-              {["Đi đón", "Đã tới", "Gặp khách", "Chở khách"].map((step, i) => (
-                <li
-                  key={step}
-                  className={`rounded-lg py-2 text-center font-bold ${
-                    i <= progress
-                      ? "gradient-primary text-primary-foreground shadow-glow"
-                      : "bg-background text-muted-foreground"
-                  }`}
-                >
-                  {step}
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-
-        {cta && (
-          <button
-            onClick={handleCta}
-            className="mt-2 w-full rounded-2xl gradient-primary py-4 text-sm font-black uppercase tracking-wide text-primary-foreground shadow-glow"
-          >
-            {cta.label}
-          </button>
-        )}
       </div>
 
       {summaryOpen && driverId && (
@@ -478,34 +547,6 @@ function ActionBtn({
       <Icon className="h-4 w-4 text-primary" />
       {label}
     </button>
-  );
-}
-
-// Mở app Google Maps để chỉ đường/điều hướng giọng nói đầy đủ. Ưu tiên toạ độ
-// thật (chính xác hơn); nếu chuyến chưa lưu toạ độ thì dùng địa chỉ dạng chữ.
-function NavigateButton({
-  label,
-  address,
-  lat,
-  lng,
-}: {
-  label: string;
-  address: string;
-  lat: number | null;
-  lng: number | null;
-}) {
-  const destination = lat != null && lng != null ? `${lat},${lng}` : address;
-  const href = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3 text-sm font-bold text-primary-foreground shadow-glow transition active:scale-[.98]"
-    >
-      <Navigation className="h-4 w-4" />
-      {label}
-    </a>
   );
 }
 
