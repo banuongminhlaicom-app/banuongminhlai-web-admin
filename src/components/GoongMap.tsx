@@ -78,16 +78,13 @@ export function GoongMap({
           readyRef.current = true;
           syncMap(goongjs, map);
         });
-        // "dragstart" chỉ bắn khi người dùng tự kéo bản đồ (easeTo/flyTo do
-        // code gọi không kích hoạt sự kiện này). zoomstart/rotatestart thì có
-        // bắn cho cả 2 trường hợp nên phải kiểm tra originalEvent để phân biệt.
+        // Chỉ dùng "dragstart" để phát hiện thao tác tự do của người dùng —
+        // sự kiện này CHỈ bắn khi người dùng thật sự kéo bản đồ, không bao giờ
+        // bắn do code tự gọi easeTo/flyTo. Từng thử thêm zoomstart/rotatestart
+        // (lọc qua originalEvent) nhưng chính easeTo tự động của auto-tracking
+        // cũng có thể kích hoạt các sự kiện đó, tự tắt auto-tracking ngoài ý
+        // muốn rồi làm camera đứng yên ở góc phẳng — bỏ hẳn cho chắc.
         map.on("dragstart", () => setAutoTracking(false));
-        map.on("zoomstart", (e) => {
-          if (e.originalEvent) setAutoTracking(false);
-        });
-        map.on("rotatestart", (e) => {
-          if (e.originalEvent) setAutoTracking(false);
-        });
         mapRef.current = map;
       })
       .catch(() => {
@@ -154,25 +151,34 @@ export function GoongMap({
 
     if (routePolyline) drawRoute(map, routePolyline);
 
-    if (navigate && driver) {
-      // Luôn cập nhật hướng di chuyển (kể cả lúc không tự bám) để nút định vị
-      // luôn xoay camera đúng hướng xe ngay khi bấm — chỉ tính lại khi đã đi
-      // đủ xa (~8m) so với lần trước, tránh hướng bị nhiễu lúc gần như đứng yên.
-      const prev = prevDriverRef.current;
-      if (prev) {
-        const movedM = Math.hypot(driver.lat - prev.lat, driver.lng - prev.lng) * 111_000; // ước lượng nhanh, đủ dùng để so ngưỡng
-        if (movedM > 8) {
-          bearingRef.current = computeBearing(prev, driver);
+    if (navigate) {
+      // QUAN TRỌNG: ở chế độ dẫn đường, KHÔNG BAO GIỜ được rơi xuống fitBounds
+      // bên dưới — fitBounds luôn đưa camera về góc nhìn phẳng top-down, xoá
+      // mất pitch/bearing (đây chính là lý do bản đồ bị "phẳng lại" dù đã set
+      // pitch: 60 — driver GPS chưa kịp về nhưng pickup+dropoff đã có sẵn 2
+      // điểm nên nhánh cũ vẫn tính fitBounds như thường). Chưa có vị trí tài
+      // xế thì tạm lấy điểm đón/đến làm tâm, vẫn giữ nguyên góc nghiêng 3D.
+      const focus = driver ?? pickup ?? dropoff;
+      if (driver) {
+        // Luôn cập nhật hướng di chuyển (kể cả lúc không tự bám) để nút định vị
+        // luôn xoay camera đúng hướng xe ngay khi bấm — chỉ tính lại khi đã đi
+        // đủ xa (~8m) so với lần trước, tránh hướng bị nhiễu lúc gần như đứng yên.
+        const prev = prevDriverRef.current;
+        if (prev) {
+          const movedM = Math.hypot(driver.lat - prev.lat, driver.lng - prev.lng) * 111_000; // ước lượng nhanh, đủ dùng để so ngưỡng
+          if (movedM > 8) {
+            bearingRef.current = computeBearing(prev, driver);
+            prevDriverRef.current = driver;
+          }
+        } else {
           prevDriverRef.current = driver;
         }
-      } else {
-        prevDriverRef.current = driver;
       }
-      // Chỉ tự kéo camera theo xe khi đang bật auto-tracking — người dùng đang
-      // xem tự do (đã kéo/vuốt bản đồ) thì để yên cho tới khi họ bấm nút định vị.
-      if (autoTracking) {
+      // Chỉ tự kéo camera khi đang bật auto-tracking — người dùng đang xem tự
+      // do (đã kéo/vuốt bản đồ) thì để yên cho tới khi họ bấm nút định vị.
+      if (autoTracking && focus) {
         map.easeTo({
-          center: [driver.lng, driver.lat],
+          center: [focus.lng, focus.lat],
           zoom: 18,
           pitch: 60,
           bearing: bearingRef.current,
