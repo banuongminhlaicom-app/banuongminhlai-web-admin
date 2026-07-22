@@ -1,17 +1,18 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle,
-  ArrowLeft,
   ArrowUp,
-  ChevronUp,
   CornerUpLeft,
   CornerUpRight,
+  LifeBuoy,
   Loader2,
   MessageSquare,
+  MoreHorizontal,
   Phone,
+  Power,
   Redo2,
+  Route as RouteIcon,
   Undo2,
   X,
 } from "lucide-react";
@@ -132,20 +133,8 @@ function DriverTripDetail() {
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [isOnTrip]);
 
-  // Bottom sheet thu gọn/mở rộng: bấm vào tay cầm hoặc vuốt lên/xuống trên đó.
+  // Mở overlay "Tổng quan" xem chi tiết đầy đủ chuyến đi.
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  const sheetTouchStartYRef = useRef<number | null>(null);
-  const onSheetTouchStart = (e: React.TouchEvent) => {
-    sheetTouchStartYRef.current = e.touches[0]?.clientY ?? null;
-  };
-  const onSheetTouchEnd = (e: React.TouchEvent) => {
-    const startY = sheetTouchStartYRef.current;
-    sheetTouchStartYRef.current = null;
-    if (startY == null) return;
-    const deltaY = (e.changedTouches[0]?.clientY ?? startY) - startY;
-    if (deltaY < -24) setSheetExpanded(true);
-    else if (deltaY > 24) setSheetExpanded(false);
-  };
 
   // Điểm đang hướng tới: điểm đón khi chưa gặp khách, điểm trả khi đang chở khách.
   const targetCoord =
@@ -253,134 +242,164 @@ function DriverTripDetail() {
     driverStatus ?? "",
   );
 
-  const statusText =
-    driverStatus === "in_progress"
-      ? "Đang đưa khách về điểm đến"
-      : driverStatus === "going_to_pickup"
-        ? "Đang đến điểm đón khách"
-        : driverStatus === "arrived"
-          ? "Đã tới điểm đón"
-          : driverStatus === "met_customer"
-            ? "Đã gặp khách — chờ PIN"
-            : "Chuẩn bị lên đường";
+  const inProgress = driverStatus === "in_progress";
+  const stepLabel = inProgress ? "2. Trả khách" : "1. Đón khách";
+  const targetAddress = inProgress ? trip.dropoff_address : trip.pickup_address;
+  const etaText = remaining
+    ? `${formatMinutes((remaining.km / 30) * 60)} • ${
+        remaining.km < 1 ? `${Math.round(remaining.km * 1000)} m` : formatKm(remaining.km)
+      }`
+    : "Đang định vị…";
 
   return (
-    <div className="fixed inset-0 mx-auto max-w-md bg-background">
-      <GoongMap
-        className="absolute inset-0 h-full w-full"
-        pickup={
-          trip.pickup_lat != null && trip.pickup_lng != null
-            ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
-            : null
-        }
-        dropoff={
-          trip.dropoff_lat != null && trip.dropoff_lng != null
-            ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
-            : null
-        }
-        driver={livePos}
-        routePolyline={liveRoute?.polyline}
-        navigate={followCamera}
-        fallbackProps={{ showRoute: true, driverPin: true }}
-      />
+    <div className="fixed inset-0 mx-auto flex max-w-md flex-col bg-background">
+      {/* ============ NỬA TRÊN: BẢN ĐỒ + LỚP PHỦ ============ */}
+      <div className="relative flex-1 overflow-hidden">
+        <GoongMap
+          className="absolute inset-0 h-full w-full"
+          pickup={
+            trip.pickup_lat != null && trip.pickup_lng != null
+              ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+              : null
+          }
+          dropoff={
+            trip.dropoff_lat != null && trip.dropoff_lng != null
+              ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
+              : null
+          }
+          driver={livePos}
+          routePolyline={liveRoute?.polyline}
+          navigate={followCamera}
+          fallbackProps={{ showRoute: true, driverPin: true }}
+        />
 
-      {currentStep ? (
-        // Banner dẫn đường kiểu Grab/Google Maps: tối màu, ép sát cạnh trên
-        // cùng (không viền/bo góc nổi như thẻ trắng cũ), icon rẽ + khoảng cách
-        // to rõ + tên đường kế tiếp — đọc được nhanh khi đang lái.
-        <div className="safe-top absolute inset-x-0 top-0 z-10 bg-[#0b0f1a]/95 pb-3 shadow-elevated backdrop-blur">
-          <div className="flex items-center justify-between px-4 pt-3">
-            <button
-              onClick={() => navigate({ to: "/driver" })}
-              className="grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <div className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white">
-              {trip.code}
-            </div>
+        {/* Turn-by-turn badge (góc trên trái): nền đen, icon rẽ + khoảng cách */}
+        <div className="safe-top pointer-events-none absolute inset-x-0 top-0 flex items-start gap-2 px-3 pt-3">
+          <div className="flex items-center gap-2 rounded-2xl bg-[#111827] px-3 py-2 text-white shadow-elevated">
+            <ManeuverIcon maneuver={currentStep?.maneuver ?? null} className="h-6 w-6" />
+            <span className="text-xl font-black leading-none">
+              {currentStep && stepDistanceM != null
+                ? stepDistanceM < 1000
+                  ? `${stepDistanceM} m`
+                  : formatKm(stepDistanceM / 1000)
+                : "—"}
+            </span>
           </div>
-          <div className="mt-2 flex items-center gap-3 px-4">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 text-white">
-              <ManeuverIcon maneuver={currentStep.maneuver} className="h-7 w-7" />
+          {currentStep?.instruction && (
+            <div className="max-w-[52%] truncate rounded-2xl bg-[#1d4ed8] px-3 py-2 text-xs font-bold text-white shadow-elevated">
+              {currentStep.instruction}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-2xl font-black leading-tight text-white">
-                {stepDistanceM != null
-                  ? stepDistanceM < 1000
-                    ? `${stepDistanceM} m`
-                    : formatKm(stepDistanceM / 1000)
-                  : "—"}
-              </div>
-              <div className="truncate text-sm font-medium text-white/70">
-                {currentStep.instruction}
-              </div>
-            </div>
+          )}
+        </div>
+
+        {/* ETA badge (thẻ trắng đè mép dưới bản đồ, căn giữa) */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+          <div className="rounded-full bg-white px-4 py-1.5 text-sm font-bold text-[#111827] shadow-elevated">
+            {etaText}
           </div>
         </div>
-      ) : (
-        <div className="safe-top absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 py-3">
+      </div>
+
+      {/* ============ NỬA DƯỚI: BOTTOM SHEET ============ */}
+      <div className="safe-bottom shrink-0 rounded-t-3xl bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.12)]">
+        {/* Row 1: trạng thái chuyến đi */}
+        <div className="grid grid-cols-3 items-center px-4 pt-3 pb-2">
+          <div className="flex items-center gap-1.5 text-[#374151]">
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#111827] text-xs font-black text-white">
+              1
+            </span>
+            <span className="text-xs font-semibold">Địa điểm</span>
+          </div>
+          <div className="text-center">
+            <div className="text-sm font-black text-[#f0592b]">{stepLabel}</div>
+            <div className="text-[11px] text-muted-foreground">{trip.vehicle_type}</div>
+          </div>
+          <button
+            onClick={() => setSheetExpanded(true)}
+            className="flex items-center justify-end gap-1 text-[#374151]"
+          >
+            <RouteIcon className="h-4 w-4" />
+            <span className="text-xs font-semibold">Tổng quan</span>
+          </button>
+        </div>
+
+        {/* Row 2: chi tiết cuốc xe */}
+        <div className="px-4 pb-3">
+          <div className="truncate text-sm font-semibold text-[#374151]">
+            {customer?.full_name ?? "Khách hàng"}
+          </div>
+          <div className="mt-0.5 line-clamp-2 text-[17px] font-bold leading-snug text-[#111827]">
+            {targetAddress}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-sm font-black text-[#111827]">{formatVND(trip.price)}</span>
+            <PaymentBadge method={trip.payment_method} />
+          </div>
+        </div>
+
+        {/* Row 3: thanh công cụ (4 cột, có vạch chia) */}
+        <div className="grid grid-cols-4 border-t border-[#e5e7eb]">
+          <ToolCell Icon={MessageSquare} label="Chat" onClick={() => toast("Mở khung chat")} />
+          <ToolCell
+            Icon={Phone}
+            label="Cuộc gọi miễn phí"
+            onClick={() => toast("Đang gọi khách...")}
+            divider
+          />
+          <ToolCell
+            Icon={LifeBuoy}
+            label="Trung tâm Hỗ trợ"
+            onClick={() => toast("Đang kết nối tổng đài...")}
+            divider
+          />
+          <ToolCell
+            Icon={MoreHorizontal}
+            label="Xem thêm"
+            onClick={() => setIssueOpen(true)}
+            divider
+          />
+        </div>
+
+        {/* Row 4: nút hành động chính + nút tròn */}
+        <div className="flex items-center gap-3 border-t border-[#e5e7eb] px-4 py-3">
+          <button
+            onClick={handleCta}
+            disabled={!cta}
+            className="h-14 flex-1 rounded-2xl bg-[#00b14f] text-base font-black text-white shadow-glow transition active:scale-[.98] disabled:opacity-50"
+          >
+            {cta?.label ?? "Đang cập nhật…"}
+          </button>
           <button
             onClick={() => navigate({ to: "/driver" })}
-            className="grid h-10 w-10 place-items-center rounded-full bg-surface/95 shadow-elevated backdrop-blur"
+            aria-label="Thoát màn hình chuyến"
+            className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#00b14f] text-white shadow-glow transition active:scale-[.96]"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <Power className="h-6 w-6" />
           </button>
-          <div className="rounded-full bg-surface/95 px-3 py-1.5 text-xs font-bold shadow-elevated backdrop-blur">
-            {trip.code}
-          </div>
         </div>
-      )}
+      </div>
 
-      {/* Bottom sheet: thu gọn chỉ còn ETA + nút thao tác chính, vuốt lên/bấm
-          vào tay cầm để xem chi tiết đơn (khách hàng, địa chỉ, giá...). */}
-      <div className="safe-bottom absolute inset-x-0 bottom-0 z-20">
-        <div className="rounded-t-3xl bg-background shadow-elevated">
-          <button
-            type="button"
-            onClick={() => setSheetExpanded((v) => !v)}
-            onTouchStart={onSheetTouchStart}
-            onTouchEnd={onSheetTouchEnd}
-            className="flex w-full items-center justify-center pt-2 pb-1"
-            aria-label={sheetExpanded ? "Thu gọn chi tiết chuyến" : "Xem chi tiết chuyến"}
-          >
-            <span className="h-1.5 w-10 rounded-full bg-muted" />
-          </button>
-
-          <div className="flex items-center gap-3 px-5 pb-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                {statusText}
-                <ChevronUp
-                  className={cn(
-                    "h-3 w-3 shrink-0 transition-transform",
-                    sheetExpanded && "rotate-180",
-                  )}
-                />
-              </div>
-              <div className="text-sm font-black">
-                {remaining
-                  ? `Còn ${formatKm(remaining.km)} · ${formatMinutes((remaining.km / 30) * 60)}`
-                  : "Đang định vị…"}
-              </div>
-            </div>
-            {cta && (
-              <button
-                onClick={handleCta}
-                className="shrink-0 rounded-2xl gradient-primary px-5 py-3 text-xs font-black uppercase tracking-wide text-primary-foreground shadow-glow"
-              >
-                {cta.label}
-              </button>
-            )}
-          </div>
-
+      {/* Overlay chi tiết đầy đủ — mở từ "Tổng quan" */}
+      {sheetExpanded && (
+        <div
+          className="absolute inset-0 z-30 flex flex-col justify-end bg-black/50"
+          onClick={() => setSheetExpanded(false)}
+        >
           <div
-            className={cn(
-              "overflow-hidden transition-[max-height] duration-300 ease-out",
-              sheetExpanded ? "max-h-[65vh] overflow-y-auto" : "max-h-0",
-            )}
+            className="safe-bottom max-h-[82vh] overflow-y-auto rounded-t-3xl bg-background p-5"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="space-y-3 px-5 pb-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-black">Tổng quan chuyến đi</h3>
+              <button
+                onClick={() => setSheetExpanded(false)}
+                className="grid h-8 w-8 place-items-center rounded-full bg-surface"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
               <div className="rounded-3xl bg-surface p-4">
                 <div className="flex items-center gap-3">
                   <div className="grid h-12 w-12 place-items-center rounded-2xl bg-background text-lg font-black text-primary">
@@ -410,10 +429,6 @@ function DriverTripDetail() {
                   >
                     <MessageSquare className="h-4 w-4" />
                   </button>
-                </div>
-
-                <div className="mt-3 border-t border-border/60 pt-3 text-center text-[11px]">
-                  <Cell label="Xe khách" value={trip.vehicle_type} />
                 </div>
               </div>
 
@@ -453,7 +468,7 @@ function DriverTripDetail() {
                 </div>
               </div>
 
-              {driverStatus === "in_progress" && (
+              {inProgress && (
                 <div className="grid grid-cols-2 gap-2 rounded-3xl bg-surface p-4 text-center text-xs">
                   <div>
                     <div className="text-muted-foreground">Đã đi</div>
@@ -468,20 +483,7 @@ function DriverTripDetail() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <ActionBtn
-                  label="Báo sự cố"
-                  Icon={AlertTriangle}
-                  onClick={() => setIssueOpen(true)}
-                />
-                <ActionBtn
-                  label="Hỗ trợ"
-                  Icon={Phone}
-                  onClick={() => toast("Đang kết nối tổng đài...")}
-                />
-              </div>
-
-              {driverStatus !== "in_progress" && (
+              {!inProgress && (
                 <div className="rounded-3xl bg-surface p-3">
                   <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
                     Tiến trình
@@ -505,7 +507,7 @@ function DriverTripDetail() {
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {summaryOpen && driverId && (
         <SummarySheet
@@ -550,23 +552,45 @@ function useElapsed(startedAt: number | null) {
   return formatMinutes(Math.max(0, (now - startedAt) / 60000));
 }
 
-function ActionBtn({
+// Một ô trong thanh công cụ 4 cột của bottom sheet (Chat / Gọi / Hỗ trợ / Xem
+// thêm). `divider` vẽ vạch chia mờ bên trái, ngăn cách với ô trước.
+function ToolCell({
   label,
   Icon,
   onClick,
+  divider,
 }: {
   label: string;
   Icon: typeof Phone;
   onClick: () => void;
+  divider?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1 rounded-2xl bg-surface p-3 font-semibold"
+      className={cn(
+        "flex flex-col items-center gap-1 px-1 py-3 text-[11px] font-medium text-[#374151]",
+        divider && "border-l border-[#e5e7eb]",
+      )}
     >
-      <Icon className="h-4 w-4 text-primary" />
-      {label}
+      <Icon className="h-5 w-5 text-[#111827]" />
+      <span className="text-center leading-tight">{label}</span>
     </button>
+  );
+}
+
+// Badge phương thức thanh toán: tiền mặt (xám) vs thẻ/ví (xanh dương).
+function PaymentBadge({ method }: { method: "cash" | "transfer" | "qr" }) {
+  const isCash = method === "cash";
+  return (
+    <span
+      className={cn(
+        "rounded-md px-2 py-0.5 text-[11px] font-bold",
+        isCash ? "bg-[#e5e7eb] text-[#374151]" : "bg-[#2563eb] text-white",
+      )}
+    >
+      {isCash ? "Tiền mặt" : "Thẻ / Ví"}
+    </span>
   );
 }
 
@@ -595,15 +619,6 @@ function ManeuverIcon({
     default:
       return <ArrowUp className={className} />;
   }
-}
-
-function Cell({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-xs font-black">{value}</div>
-    </div>
-  );
 }
 
 function SummarySheet({

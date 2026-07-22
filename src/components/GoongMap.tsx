@@ -17,6 +17,28 @@ export interface Coord {
   lng: number;
 }
 
+// Tạo phần tử DOM cho marker tài xế: vòng tròn xanh dương + mũi tên trắng chỉ
+// hướng đi. Trả về cả `inner` để component xoay theo bearing bằng CSS transform
+// (mapbox/goong quản lý transform của `wrap` để đặt vị trí, nên phải xoay lớp
+// con để không bị ghi đè).
+function makeDriverArrowEl() {
+  const wrap = document.createElement("div");
+  wrap.style.width = "42px";
+  wrap.style.height = "42px";
+  wrap.style.pointerEvents = "none";
+  const inner = document.createElement("div");
+  inner.style.width = "100%";
+  inner.style.height = "100%";
+  inner.style.transition = "transform 300ms ease-out";
+  inner.innerHTML =
+    '<svg viewBox="0 0 42 42" width="42" height="42" xmlns="http://www.w3.org/2000/svg">' +
+    '<circle cx="21" cy="21" r="15" fill="#2563eb" stroke="#ffffff" stroke-width="3"/>' +
+    '<path d="M21 12 L29 27 L21 22.5 L13 27 Z" fill="#ffffff"/>' +
+    "</svg>";
+  wrap.appendChild(inner);
+  return { wrap, inner };
+}
+
 // Bản đồ Goong tương tác: marker điểm đón/đến, marker xe tài xế (realtime),
 // vẽ tuyến đường. Nếu chưa cấu hình Maptiles key thì rơi về MapPreview (ảnh
 // bản đồ tĩnh cũ) — giao diện không vỡ, luồng đặt xe vẫn chạy như trước.
@@ -45,6 +67,9 @@ export function GoongMap({
   const readyRef = useRef(false);
   const prevDriverRef = useRef<Coord | null>(null);
   const bearingRef = useRef(0);
+  // Phần tử bên trong marker tài xế — xoay riêng bằng CSS transform theo hướng
+  // đi (bearing), không phụ thuộc SDK có hỗ trợ setRotation hay không.
+  const driverArrowRef = useRef<HTMLDivElement | null>(null);
 
   // Chế độ dẫn đường: camera tự bám vị trí xe (mặc định) cho tới khi người
   // dùng tự kéo/vuốt bản đồ — lúc đó ngừng bám để họ xem tự do, nút định vị
@@ -182,7 +207,25 @@ export function GoongMap({
 
     put("pickup", pickup, "#ef4444");
     put("dropoff", dropoff, "#22c55e");
-    put("driver", driver, "#1f2937");
+
+    // Marker tài xế: mũi tên điều hướng xanh dương xoay theo hướng đi, thay cho
+    // ghim mặc định (giống Grab/Google Maps Navigation).
+    if (!driver) {
+      markersRef.current.driver?.remove();
+      delete markersRef.current.driver;
+      driverArrowRef.current = null;
+    } else if (!markersRef.current.driver) {
+      const { wrap, inner } = makeDriverArrowEl();
+      driverArrowRef.current = inner;
+      markersRef.current.driver = new goongjs.Marker({ element: wrap })
+        .setLngLat([driver.lng, driver.lat])
+        .addTo(map);
+    } else {
+      markersRef.current.driver.setLngLat([driver.lng, driver.lat]);
+    }
+    if (driverArrowRef.current) {
+      driverArrowRef.current.style.transform = `rotate(${bearingRef.current}deg)`;
+    }
 
     if (routePolyline) drawRoute(map, routePolyline);
 
