@@ -177,6 +177,7 @@ export function GoongMap({
         zoom: 18,
         pitch: 60,
         bearing: bearingRef.current,
+        essential: true,
         duration: 600,
       });
     };
@@ -253,11 +254,14 @@ export function GoongMap({
       // Chỉ tự kéo camera khi đang bật auto-tracking — người dùng đang xem tự
       // do (đã kéo/vuốt bản đồ) thì để yên cho tới khi họ bấm nút định vị.
       if (autoTracking && focus) {
+        // Mỗi nhịp GPS: giữ nguyên góc 3D (pitch 60, zoom 18), chỉ dời tâm +
+        // xoay theo hướng. essential:true để không bị bỏ qua khi giảm chuyển động.
         map.easeTo({
           center: [focus.lng, focus.lat],
           zoom: 18,
           pitch: 60,
           bearing: bearingRef.current,
+          essential: true,
           duration: 900,
         });
       }
@@ -311,9 +315,11 @@ export function GoongMap({
     }
   }
 
-  // Kéo camera mượt về lại vị trí xe, xoay theo hướng đang di chuyển, rồi bật
-  // lại auto-tracking. Dùng flyTo (mượt/uốn cong hơn easeTo) vì đây là hành
-  // động 1 lần theo yêu cầu người dùng, không phải cập nhật liên tục mỗi nhịp GPS.
+  // Bấm nút định vị: ép camera về đúng chuẩn Navigation View 3D (cận cảnh,
+  // ngửa 60°, xoay theo hướng xe) rồi bật lại auto-tracking. Dùng flyTo cho
+  // hiệu ứng bay mượt 1 lần theo yêu cầu người dùng.
+  // - essential:true để animation không bị bỏ qua khi máy bật "giảm chuyển động".
+  // - speed thay cho duration để tốc độ bay ổn định bất kể quãng cách xa/gần.
   const handleRecenter = () => {
     const map = mapRef.current;
     const p = propsRef.current;
@@ -324,7 +330,8 @@ export function GoongMap({
       zoom: 18,
       pitch: 60,
       bearing: bearingRef.current,
-      duration: 900,
+      essential: true,
+      speed: 1.2,
     });
     setAutoTracking(true);
   };
