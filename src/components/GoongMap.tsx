@@ -324,7 +324,15 @@ export function GoongMap({
     const map = mapRef.current;
     const p = propsRef.current;
     const pos = p.driver ?? p.pickup ?? p.dropoff;
-    if (!map || !pos) return;
+    if (!map || !pos) {
+      // Log chẩn đoán tạm thời — giúp xác định vì sao camera không nghiêng.
+      console.log("[recenter] bỏ qua: map hoặc vị trí chưa sẵn sàng", {
+        hasMap: !!map,
+        hasPos: !!pos,
+      });
+      return;
+    }
+    const beforePitch = map.getPitch();
     map.flyTo({
       center: [pos.lng, pos.lat],
       zoom: 18,
@@ -334,6 +342,10 @@ export function GoongMap({
       speed: 1.2,
     });
     setAutoTracking(true);
+    // Log chẩn đoán tạm thời: sau ~1.3s xem pitch có lên 60 không.
+    window.setTimeout(() => {
+      console.log(`[recenter] pitch ${beforePitch} -> ${map.getPitch()} (kỳ vọng ~60)`);
+    }, 1300);
   };
 
   // Chưa cấu hình Maptiles key → dùng bản đồ tĩnh cũ để giao diện không trống.

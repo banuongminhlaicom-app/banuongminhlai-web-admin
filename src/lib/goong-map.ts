@@ -36,6 +36,7 @@ export interface GoongMapInstance {
   fitBounds(bounds: unknown, options?: unknown): void;
   easeTo(options: Record<string, unknown>): void;
   flyTo(options: Record<string, unknown>): void;
+  getPitch(): number;
   isStyleLoaded(): boolean;
 }
 
