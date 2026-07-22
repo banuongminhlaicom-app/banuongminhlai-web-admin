@@ -109,6 +109,8 @@ export function GoongMap({
           zoom: p.navigate ? 18 : 14,
           pitch: p.navigate ? 60 : 0,
         });
+        // Phơi map ra window để chẩn đoán nhanh từ console (window.__goongMap.getPitch()).
+        (window as unknown as { __goongMap?: GoongMapInstance }).__goongMap = map;
         map.on("load", () => {
           readyRef.current = true;
           syncMap(goongjs, map);
@@ -166,23 +168,34 @@ export function GoongMap({
   // mãi không có gì kéo nghiêng lên nữa.
   useEffect(() => {
     if (!navigate) return;
-    const map = mapRef.current;
-    if (!map) return;
     const tilt = () => {
+      const map = mapRef.current;
+      if (!map || !readyRef.current) return false;
       const p = propsRef.current;
       const focus = p.driver ?? p.pickup ?? p.dropoff;
-      if (!focus) return;
-      map.easeTo({
-        center: [focus.lng, focus.lat],
+      // Ép góc 3D bất kể có focus/toạ độ hay chưa — center bỏ trống thì giữ tâm
+      // hiện tại, cái quan trọng là pitch/zoom được set. Không phụ thuộc
+      // autoTracking để lúc mới vào chế độ dẫn đường luôn nghiêng lên.
+      const opts: Record<string, unknown> = {
         zoom: 18,
         pitch: 60,
         bearing: bearingRef.current,
         essential: true,
         duration: 600,
-      });
+      };
+      if (focus) opts.center = [focus.lng, focus.lat];
+      map.easeTo(opts);
+      return true;
     };
-    if (readyRef.current) tilt();
-    else map.once("load", tilt);
+    // SDK tải bất đồng bộ: map có thể chưa được tạo/chưa "load" đúng lúc navigate
+    // vừa bật. Thử ngay, nếu chưa được thì lặp lại mỗi 150ms tới khi thành công
+    // (tránh lỗ hổng cũ: effect thoát sớm rồi không bao giờ chạy lại vì navigate
+    // không đổi nữa, khiến camera kẹt phẳng).
+    if (tilt()) return;
+    const iv = window.setInterval(() => {
+      if (tilt()) window.clearInterval(iv);
+    }, 150);
+    return () => window.clearInterval(iv);
   }, [navigate]);
 
   function syncMap(goongjs: NonNullable<typeof window.goongjs>, map: GoongMapInstance) {
