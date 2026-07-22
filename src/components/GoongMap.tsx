@@ -39,6 +39,30 @@ function makeDriverArrowEl() {
   return { wrap, inner };
 }
 
+// Hướng "phía trước" theo tuyến đường: đi dọc polyline (bắt đầu ~ vị trí tài
+// xế) tới khi tích luỹ ~60m rồi lấy bearing tới điểm đó. Dùng để xoay bản đồ
+// theo hướng đi ngay cả khi tài xế đang đứng yên (chưa có heading từ GPS).
+function forwardBearingFromRoute(driver: Coord, routePolyline: string): number | null {
+  const pts = decodePolyline(routePolyline); // [lng, lat][]
+  if (pts.length < 2) return null;
+  const distM = (a: Coord, b: Coord) => {
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const la1 = (a.lat * Math.PI) / 180;
+    const la2 = (b.lat * Math.PI) / 180;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2;
+    return 2 * 6371000 * Math.asin(Math.sqrt(h));
+  };
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const b: Coord = { lat: pts[i][1], lng: pts[i][0] };
+    acc += distM({ lat: pts[i - 1][1], lng: pts[i - 1][0] }, b);
+    if (acc >= 60) return computeBearing(driver, b);
+  }
+  const last = pts[pts.length - 1];
+  return computeBearing(driver, { lat: last[1], lng: last[0] });
+}
+
 // Bản đồ Goong tương tác: marker điểm đón/đến, marker xe tài xế (realtime),
 // vẽ tuyến đường. Nếu chưa cấu hình Maptiles key thì rơi về MapPreview (ảnh
 // bản đồ tĩnh cũ) — giao diện không vỡ, luồng đặt xe vẫn chạy như trước.
@@ -67,6 +91,9 @@ export function GoongMap({
   const readyRef = useRef(false);
   const prevDriverRef = useRef<Coord | null>(null);
   const bearingRef = useRef(0);
+  // Đã có hướng thật từ GPS chuyển động chưa. Trước khi có, xoay bản đồ theo
+  // hướng tuyến đường phía trước để không bị kẹt hướng Bắc lúc đứng yên.
+  const hasHeadingRef = useRef(false);
   // Phần tử bên trong marker tài xế — xoay riêng bằng CSS transform theo hướng
   // đi (bearing), không phụ thuộc SDK có hỗ trợ setRotation hay không.
   const driverArrowRef = useRef<HTMLDivElement | null>(null);
@@ -114,7 +141,7 @@ export function GoongMap({
           readyRef.current = true;
           // Marker xác nhận build: bản top-down phải in pitch=0.
           console.log(
-            "[GoongMap] build=topdown-v2, navigate=%s, pitch=%s",
+            "[GoongMap] build=topdown-v3-headingup, navigate=%s, pitch=%s",
             p.navigate,
             map.getPitch(),
           );
@@ -178,6 +205,12 @@ export function GoongMap({
       if (!map || !readyRef.current) return false;
       const p = propsRef.current;
       const focus = p.driver ?? p.pickup ?? p.dropoff;
+      // Ngay khi vào chế độ dẫn đường, nếu chưa có hướng GPS thì xoay theo tuyến
+      // đường phía trước để bản đồ "ngẩng" đúng hướng đi từ đầu (không chờ nhịp GPS).
+      if (!hasHeadingRef.current && p.driver && p.routePolyline) {
+        const fb = forwardBearingFromRoute(p.driver, p.routePolyline);
+        if (fb != null) bearingRef.current = fb;
+      }
       // Ép zoom cận cảnh + pitch 0 (top-down) + xoay theo hướng, bất kể có focus
       // hay chưa. Không phụ thuộc autoTracking để lúc mới vào luôn về đúng khung.
       const opts: Record<string, unknown> = {
@@ -241,8 +274,12 @@ export function GoongMap({
     } else {
       markersRef.current.driver.setLngLat([driver.lng, driver.lat]);
     }
+    // Ở chế độ dẫn đường bản đồ đã xoay theo hướng đi (heading-up), nên mũi tên
+    // luôn hướng LÊN màn hình (rotate 0) — không xoay thêm kẻo bị lệch gấp đôi.
+    // Ở chế độ thường (khách theo dõi, bản đồ hướng Bắc) thì mũi tên xoay theo
+    // hướng xe để thể hiện chiều di chuyển.
     if (driverArrowRef.current) {
-      driverArrowRef.current.style.transform = `rotate(${bearingRef.current}deg)`;
+      driverArrowRef.current.style.transform = `rotate(${navigate ? 0 : bearingRef.current}deg)`;
     }
 
     if (routePolyline) drawRoute(map, routePolyline);
@@ -253,18 +290,25 @@ export function GoongMap({
       // góc cận cảnh. Chưa có GPS tài xế thì tạm lấy điểm đón/đến làm tâm.
       const focus = driver ?? pickup ?? dropoff;
       if (driver) {
-        // Luôn cập nhật hướng di chuyển (kể cả lúc không tự bám) để nút định vị
-        // luôn xoay camera đúng hướng xe ngay khi bấm — chỉ tính lại khi đã đi
-        // đủ xa (~8m) so với lần trước, tránh hướng bị nhiễu lúc gần như đứng yên.
+        // Ưu tiên hướng thật từ chuyển động GPS (đi đủ xa ~8m mới tính, tránh
+        // nhiễu lúc gần như đứng yên).
         const prev = prevDriverRef.current;
         if (prev) {
           const movedM = Math.hypot(driver.lat - prev.lat, driver.lng - prev.lng) * 111_000; // ước lượng nhanh, đủ dùng để so ngưỡng
           if (movedM > 8) {
             bearingRef.current = computeBearing(prev, driver);
             prevDriverRef.current = driver;
+            hasHeadingRef.current = true;
           }
         } else {
           prevDriverRef.current = driver;
+        }
+        // Chưa từng có hướng GPS -> xoay theo tuyến đường phía trước để bản đồ
+        // vẫn "ngẩng" đúng hướng đi ngay cả khi đang đứng yên (vd. lúc mới nhận
+        // chuyến, chờ đèn đỏ, hoặc test trên máy tính không di chuyển).
+        if (!hasHeadingRef.current && routePolyline) {
+          const fb = forwardBearingFromRoute(driver, routePolyline);
+          if (fb != null) bearingRef.current = fb;
         }
       }
       // Chỉ tự kéo camera khi đang bật auto-tracking — người dùng đang xem tự
