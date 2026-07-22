@@ -56,8 +56,8 @@ export function GoongMap({
   dropoff?: Coord | null;
   driver?: Coord | null;
   routePolyline?: string | null;
-  // Chế độ dẫn đường: camera nghiêng (pitch) + xoay theo hướng xe chạy (bearing),
-  // bám sát vị trí tài xế thay vì canh khung nhìn ôm trọn điểm đón/đến/xe.
+  // Chế độ dẫn đường: camera rọi thẳng từ trên xuống (top-down) + xoay theo
+  // hướng xe chạy (bearing), bám sát vị trí tài xế thay vì canh khung ôm trọn.
   navigate?: boolean;
   fallbackProps?: { showRoute?: boolean; driverPin?: boolean; showNearbyDrivers?: boolean };
 }) {
@@ -100,14 +100,14 @@ export function GoongMap({
         // (driverStatus vừa về) dù lúc mount còn tắt.
         const p = propsRef.current;
         const center = p.driver ?? p.pickup ?? p.dropoff ?? { lat: 10.457, lng: 105.634 };
-        // Chế độ dẫn đường: vào thẳng góc nhìn 3D nghiêng/cận cảnh ngay từ đầu,
-        // không đợi easeTo đầu tiên mới nghiêng lên (tránh khựng 2D rồi mới 3D).
+        // Chế độ dẫn đường: góc nhìn rọi thẳng từ trên xuống (top-down, pitch 0),
+        // cận cảnh và xoay theo hướng đi — KHÔNG nghiêng 3D.
         const map = new goongjs.Map({
           container: containerRef.current,
           style: MAP_STYLE,
           center: [center.lng, center.lat],
           zoom: p.navigate ? 18 : 14,
-          pitch: p.navigate ? 60 : 0,
+          pitch: 0,
         });
         map.on("load", () => {
           readyRef.current = true;
@@ -159,24 +159,23 @@ export function GoongMap({
     autoTracking,
   ]);
 
-  // Bật góc nhìn 3D ngay khi vào chế độ dẫn đường. Tách riêng khỏi effect trên
-  // vì effect đó chỉ chạy lại khi toạ độ đổi: tài xế đứng yên (chờ đèn đỏ, chờ
-  // khách) thì driver.lat/lng đứng im, nên nếu lần sync đầu lỡ nhịp — map dựng
-  // với pitch 0 lúc chưa bật dẫn đường và SDK còn đang tải — camera sẽ phẳng
-  // mãi không có gì kéo nghiêng lên nữa.
+  // Đưa camera vào chế độ dẫn đường (rọi thẳng từ trên xuống, cận cảnh, xoay
+  // theo hướng đi) ngay khi navigate bật. Tách riêng khỏi effect trên vì effect
+  // đó chỉ chạy lại khi toạ độ đổi: tài xế đứng yên thì driver.lat/lng đứng im,
+  // nên nếu lần sync đầu lỡ nhịp (SDK còn đang tải) thì camera sẽ không vào
+  // đúng zoom cận cảnh.
   useEffect(() => {
     if (!navigate) return;
-    const tilt = () => {
+    const applyNavView = () => {
       const map = mapRef.current;
       if (!map || !readyRef.current) return false;
       const p = propsRef.current;
       const focus = p.driver ?? p.pickup ?? p.dropoff;
-      // Ép góc 3D bất kể có focus/toạ độ hay chưa — center bỏ trống thì giữ tâm
-      // hiện tại, cái quan trọng là pitch/zoom được set. Không phụ thuộc
-      // autoTracking để lúc mới vào chế độ dẫn đường luôn nghiêng lên.
+      // Ép zoom cận cảnh + pitch 0 (top-down) + xoay theo hướng, bất kể có focus
+      // hay chưa. Không phụ thuộc autoTracking để lúc mới vào luôn về đúng khung.
       const opts: Record<string, unknown> = {
         zoom: 18,
-        pitch: 60,
+        pitch: 0,
         bearing: bearingRef.current,
         essential: true,
         duration: 600,
@@ -188,10 +187,10 @@ export function GoongMap({
     // SDK tải bất đồng bộ: map có thể chưa được tạo/chưa "load" đúng lúc navigate
     // vừa bật. Thử ngay, nếu chưa được thì lặp lại mỗi 150ms tới khi thành công
     // (tránh lỗ hổng cũ: effect thoát sớm rồi không bao giờ chạy lại vì navigate
-    // không đổi nữa, khiến camera kẹt phẳng).
-    if (tilt()) return;
+    // không đổi nữa, khiến camera kẹt sai khung).
+    if (applyNavView()) return;
     const iv = window.setInterval(() => {
-      if (tilt()) window.clearInterval(iv);
+      if (applyNavView()) window.clearInterval(iv);
     }, 150);
     return () => window.clearInterval(iv);
   }, [navigate]);
@@ -242,10 +241,9 @@ export function GoongMap({
     if (routePolyline) drawRoute(map, routePolyline);
 
     if (navigate) {
-      // Ở chế độ dẫn đường không được rơi xuống fitBounds bên dưới: đo thực tế
-      // trên Goong JS thì fitBounds giữ nguyên pitch nhưng ép bearing về 0 và
-      // thu nhỏ zoom (18 -> ~13.7), tức mất hướng xe và mất luôn góc cận cảnh.
-      // Chưa có GPS tài xế thì tạm lấy điểm đón/đến làm tâm, vẫn giữ góc 3D.
+      // Ở chế độ dẫn đường không được rơi xuống fitBounds bên dưới: fitBounds ép
+      // bearing về 0 và thu nhỏ zoom (18 -> ~13.7), tức mất hướng xe và mất luôn
+      // góc cận cảnh. Chưa có GPS tài xế thì tạm lấy điểm đón/đến làm tâm.
       const focus = driver ?? pickup ?? dropoff;
       if (driver) {
         // Luôn cập nhật hướng di chuyển (kể cả lúc không tự bám) để nút định vị
@@ -265,12 +263,12 @@ export function GoongMap({
       // Chỉ tự kéo camera khi đang bật auto-tracking — người dùng đang xem tự
       // do (đã kéo/vuốt bản đồ) thì để yên cho tới khi họ bấm nút định vị.
       if (autoTracking && focus) {
-        // Mỗi nhịp GPS: giữ nguyên góc 3D (pitch 60, zoom 18), chỉ dời tâm +
+        // Mỗi nhịp GPS: giữ top-down cận cảnh (pitch 0, zoom 18), chỉ dời tâm +
         // xoay theo hướng. essential:true để không bị bỏ qua khi giảm chuyển động.
         map.easeTo({
           center: [focus.lng, focus.lat],
           zoom: 18,
-          pitch: 60,
+          pitch: 0,
           bearing: bearingRef.current,
           essential: true,
           duration: 900,
@@ -326,9 +324,9 @@ export function GoongMap({
     }
   }
 
-  // Bấm nút định vị: ép camera về đúng chuẩn Navigation View 3D (cận cảnh,
-  // ngửa 60°, xoay theo hướng xe) rồi bật lại auto-tracking. Dùng flyTo cho
-  // hiệu ứng bay mượt 1 lần theo yêu cầu người dùng.
+  // Bấm nút định vị: bay về khung dẫn đường top-down (rọi thẳng từ trên xuống,
+  // cận cảnh, xoay theo hướng xe — pitch 0, KHÔNG nghiêng) rồi bật lại
+  // auto-tracking. Dùng flyTo cho hiệu ứng bay mượt 1 lần.
   // - essential:true để animation không bị bỏ qua khi máy bật "giảm chuyển động".
   // - speed thay cho duration để tốc độ bay ổn định bất kể quãng cách xa/gần.
   const handleRecenter = () => {
@@ -339,7 +337,7 @@ export function GoongMap({
     map.flyTo({
       center: [pos.lng, pos.lat],
       zoom: 18,
-      pitch: 60,
+      pitch: 0,
       bearing: bearingRef.current,
       essential: true,
       speed: 1.2,
