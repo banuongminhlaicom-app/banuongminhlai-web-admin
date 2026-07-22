@@ -190,6 +190,66 @@ export function subscribeTripStatus(id: string, onUpdate: (trip: TripRow) => voi
 }
 
 // ---------------------------------------------------------------------------
+// Chat trong chuyến (Giai đoạn 8) — khách ↔ tài xế
+// ---------------------------------------------------------------------------
+export interface TripMessageRow {
+  id: string;
+  trip_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+}
+
+export async function getTripMessages(tripId: string): Promise<TripMessageRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("trip_messages")
+    .select("id, trip_id, sender_id, content, created_at")
+    .eq("trip_id", tripId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function sendTripMessage(
+  tripId: string,
+  senderId: string,
+  content: string,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const text = content.trim();
+  if (!text) return;
+  const { error } = await supabase
+    .from("trip_messages")
+    .insert({ trip_id: tripId, sender_id: senderId, content: text });
+  if (error) throw error;
+}
+
+export function subscribeTripMessages(
+  tripId: string,
+  onInsert: (row: TripMessageRow) => void,
+): () => void {
+  if (!supabase) return () => {};
+  const client = supabase;
+  const channel = client
+    .channel(`trip-messages-${tripId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "trip_messages",
+        filter: `trip_id=eq.${tripId}`,
+      },
+      (payload) => onInsert(payload.new as TripMessageRow),
+    )
+    .subscribe();
+  return () => {
+    client.removeChannel(channel);
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Drivers (admin.drivers.tsx)
 // ---------------------------------------------------------------------------
 export interface DriverRow {

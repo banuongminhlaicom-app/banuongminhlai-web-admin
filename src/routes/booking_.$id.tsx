@@ -17,6 +17,7 @@ import {
   subscribeTripStatus,
 } from "@/lib/queries";
 import { GoongMap } from "@/components/GoongMap";
+import { TripChat } from "@/components/TripChat";
 import { fetchRoute } from "@/lib/places";
 import { formatKm, formatMinutes, formatRelativeTime, formatVND } from "@/lib/format";
 
@@ -110,6 +111,14 @@ function RealBookingDetail({ id }: { id: string }) {
       navigate({ to: "/booking/searching", search: { tripId: id } });
     }
   }, [trip?.status, id, navigate]);
+
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Gọi tài xế bằng số thật (mở app điện thoại của máy — miễn phí).
+  const callDriver = () => {
+    if (driver?.phone) window.location.href = `tel:${driver.phone}`;
+    else toast("Tài xế chưa cập nhật số điện thoại.");
+  };
 
   if (isLoading) {
     return (
@@ -244,11 +253,11 @@ function RealBookingDetail({ id }: { id: string }) {
 
             {!isFinal && (
               <div className="mt-3 grid grid-cols-3 gap-2">
-                <ActionBtn Icon={Phone} label="Gọi" onClick={() => toast("Đang gọi tài xế...")} />
+                <ActionBtn Icon={Phone} label="Gọi" onClick={callDriver} />
                 <ActionBtn
                   Icon={MessageSquare}
                   label="Nhắn tin"
-                  onClick={() => toast("Mở khung chat")}
+                  onClick={() => setChatOpen(true)}
                 />
                 <ActionBtn
                   Icon={ShieldAlert}
@@ -321,6 +330,15 @@ function RealBookingDetail({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {chatOpen && trip?.driver_id && (
+        <TripChat
+          tripId={id}
+          selfId={trip.customer_id}
+          peerName={driver?.full_name ?? "Tài xế"}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
     </div>
   );
 }

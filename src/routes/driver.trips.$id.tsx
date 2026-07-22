@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { useLocationTracking } from "@/hooks/use-location-tracking";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { GoongMap } from "@/components/GoongMap";
+import { TripChat } from "@/components/TripChat";
 import { fetchRoute, haversineKm } from "@/lib/places";
 import { useAuthState, useRequireRole } from "@/lib/auth";
 import {
@@ -87,6 +88,13 @@ function DriverTripDetail() {
 
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Gọi khách bằng số điện thoại thật (mở app điện thoại của máy — miễn phí).
+  const callCustomer = () => {
+    if (customer?.phone) window.location.href = `tel:${customer.phone}`;
+    else toast("Khách chưa cập nhật số điện thoại.");
+  };
 
   useEffect(() => {
     if (!tripLoading && !trip) navigate({ to: "/driver" });
@@ -339,13 +347,8 @@ function DriverTripDetail() {
 
         {/* Row 3: thanh công cụ (4 cột, có vạch chia) */}
         <div className="grid grid-cols-4 border-t border-[#e5e7eb]">
-          <ToolCell Icon={MessageSquare} label="Chat" onClick={() => toast("Mở khung chat")} />
-          <ToolCell
-            Icon={Phone}
-            label="Cuộc gọi miễn phí"
-            onClick={() => toast("Đang gọi khách...")}
-            divider
-          />
+          <ToolCell Icon={MessageSquare} label="Chat" onClick={() => setChatOpen(true)} />
+          <ToolCell Icon={Phone} label="Gọi khách" onClick={callCustomer} divider />
           <ToolCell
             Icon={LifeBuoy}
             label="Trung tâm Hỗ trợ"
@@ -416,14 +419,14 @@ function DriverTripDetail() {
                     </div>
                   </div>
                   <button
-                    onClick={() => toast("Đang gọi khách...")}
+                    onClick={callCustomer}
                     className="grid h-10 w-10 place-items-center rounded-full bg-success/20 text-success"
                     aria-label="Gọi khách"
                   >
                     <Phone className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => toast("Mở khung chat")}
+                    onClick={() => setChatOpen(true)}
                     className="grid h-10 w-10 place-items-center rounded-full bg-background"
                     aria-label="Nhắn tin"
                   >
@@ -535,6 +538,15 @@ function DriverTripDetail() {
             setIssueOpen(false);
             toast.error(`Đã gửi báo cáo: ${reason}`);
           }}
+        />
+      )}
+
+      {chatOpen && driverId && (
+        <TripChat
+          tripId={trip.id}
+          selfId={driverId}
+          peerName={customer?.full_name ?? "Khách hàng"}
+          onClose={() => setChatOpen(false)}
         />
       )}
     </div>
