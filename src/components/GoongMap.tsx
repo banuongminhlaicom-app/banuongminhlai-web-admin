@@ -136,15 +136,8 @@ export function GoongMap({
           zoom: p.navigate ? 18 : 14,
           pitch: 0,
         });
-        (window as unknown as { __goongMap?: GoongMapInstance }).__goongMap = map;
         map.on("load", () => {
           readyRef.current = true;
-          // Marker xác nhận build: bản top-down phải in pitch=0.
-          console.log(
-            "[GoongMap] build=topdown-v3-headingup, navigate=%s, pitch=%s",
-            p.navigate,
-            map.getPitch(),
-          );
           syncMap(goongjs, map);
         });
         // Chỉ dùng "dragstart" để phát hiện thao tác tự do của người dùng —
