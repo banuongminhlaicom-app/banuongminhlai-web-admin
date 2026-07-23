@@ -137,21 +137,16 @@ export function GoongMap({
           zoom: p.navigate ? 18 : 14,
           pitch: 0,
         });
-        // Đã xác minh qua thực nghiệm: khung chứa (flex-1/h-full) luôn ĐÚNG
-        // kích thước ngay từ đầu — ResizeObserver không bao giờ bắn vì kích
-        // thước khung KHÔNG đổi. Lỗi thật là canvas WebGL của goong-js tự đo
-        // sai kích thước đúng lúc dựng (trước khi trình duyệt kịp layout xong
-        // cây flex cha, do map dựng trong .then() bất đồng bộ), rồi giữ
-        // nguyên mãi vì không có gì kích nó đo lại. Ép resize() ngay sau khi
-        // dựng + sau "load" (2 mốc thời điểm khác nhau) để chắc chắn bắt được
-        // lúc container đã layout xong.
-        map.resize();
-        requestAnimationFrame(() => {
-          if (!disposed) map.resize();
-        });
+
+        // Đăng ký listener + gán ref TRƯỚC MỌI THỨ KHÁC — đây là phần bắt buộc
+        // phải chạy được. Từng có lần chỉ trang tài xế bị "đông cứng" bản đồ ở
+        // kích thước nhỏ ban đầu (trang khách vẫn đúng) trong khi code 2 bên
+        // giống hệt nhau; nghi ngờ là do gọi resize() ngay lập tức (đồng bộ)
+        // ở đúng chỗ này từng ném lỗi và chặn mất các dòng code phía sau nó
+        // (bao gồm cả việc gán mapRef.current) — nay tách 2 việc riêng, và mọi
+        // lệnh resize() đều bọc an toàn để không bao giờ làm hỏng phần còn lại.
         map.on("load", () => {
           readyRef.current = true;
-          map.resize();
           syncMap(goongjs, map);
         });
         // Chỉ dùng "dragstart" để phát hiện thao tác tự do của người dùng —
@@ -163,12 +158,30 @@ export function GoongMap({
         map.on("dragstart", () => setAutoTracking(false));
         mapRef.current = map;
 
+        // Đã xác minh qua thực nghiệm: khung chứa (flex-1/h-full) luôn ĐÚNG
+        // kích thước ngay từ đầu — ResizeObserver không bao giờ bắn vì kích
+        // thước khung KHÔNG đổi. Lỗi thật là canvas WebGL của goong-js tự đo
+        // sai kích thước đúng lúc dựng, rồi giữ nguyên mãi vì không có gì kích
+        // nó đo lại. Ép resize() ở khung hình kế (chắc chắn đã layout xong) và
+        // lại lần nữa sau "load" — bọc try/catch vì đây là API của SDK ngoài,
+        // lỡ ném lỗi cũng không được phép ảnh hưởng phần khởi tạo ở trên.
+        const safeResize = () => {
+          try {
+            map.resize();
+          } catch (err) {
+            console.error("GoongMap: resize() lỗi", err);
+          }
+        };
+        requestAnimationFrame(() => {
+          if (!disposed) safeResize();
+        });
+        map.on("load", safeResize);
+
         // Vẫn giữ ResizeObserver làm lớp phòng vệ thứ 2: nếu khung chứa THẬT
         // SỰ đổi kích thước sau này (trình duyệt di động ẩn/hiện thanh địa chỉ
-        // làm đổi vh, xoay màn hình...), tự resize() lại theo, không chỉ dựa
-        // vào 2 lần gọi ép ở trên.
+        // làm đổi vh, xoay màn hình...), tự resize() lại theo.
         if (typeof ResizeObserver !== "undefined") {
-          resizeObserver = new ResizeObserver(() => map.resize());
+          resizeObserver = new ResizeObserver(safeResize);
           resizeObserver.observe(containerRef.current);
         }
       })
