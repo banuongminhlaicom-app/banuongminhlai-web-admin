@@ -158,30 +158,36 @@ export function GoongMap({
         map.on("dragstart", () => setAutoTracking(false));
         mapRef.current = map;
 
-        // Đã xác minh qua thực nghiệm: khung chứa (flex-1/h-full) luôn ĐÚNG
-        // kích thước ngay từ đầu — ResizeObserver không bao giờ bắn vì kích
-        // thước khung KHÔNG đổi. Lỗi thật là canvas WebGL của goong-js tự đo
-        // sai kích thước đúng lúc dựng, rồi giữ nguyên mãi vì không có gì kích
-        // nó đo lại. Ép resize() ở khung hình kế (chắc chắn đã layout xong) và
-        // lại lần nữa sau "load" — bọc try/catch vì đây là API của SDK ngoài,
-        // lỡ ném lỗi cũng không được phép ảnh hưởng phần khởi tạo ở trên.
-        const safeResize = () => {
+        // Trên trang tài xế, khung chứa bản đồ là `flex-1` — chiều cao phụ thuộc
+        // bottom sheet (nội dung tải bất đồng bộ: tên khách...), nên lúc map vừa
+        // dựng và gọi resize() lần đầu, container có thể CHƯA đạt chiều cao cuối
+        // cùng → canvas bị đo nhỏ rồi kẹt luôn. Gọi resize() ở NHIỀU mốc thời
+        // gian để chắc chắn có ít nhất một lần rơi vào lúc layout đã ổn định.
+        // (Trang khách dùng h-[55vh] cố định nên không dính lỗi này.)
+        const safeResize = (tag: string) => {
           try {
+            const el = containerRef.current;
+            // Log tạm thời để chẩn đoán nếu vẫn lỗi: xem container thật cao bao nhiêu.
+            console.log(
+              `[GoongMap] resize(${tag}) container=${el?.clientWidth}x${el?.clientHeight}`,
+            );
             map.resize();
           } catch (err) {
             console.error("GoongMap: resize() lỗi", err);
           }
         };
-        requestAnimationFrame(() => {
-          if (!disposed) safeResize();
+        [0, 150, 400, 800, 1200].forEach((ms) => {
+          window.setTimeout(() => {
+            if (!disposed) safeResize(`t${ms}`);
+          }, ms);
         });
-        map.on("load", safeResize);
+        map.on("load", () => safeResize("load"));
 
-        // Vẫn giữ ResizeObserver làm lớp phòng vệ thứ 2: nếu khung chứa THẬT
-        // SỰ đổi kích thước sau này (trình duyệt di động ẩn/hiện thanh địa chỉ
-        // làm đổi vh, xoay màn hình...), tự resize() lại theo.
+        // Lớp phòng vệ liên tục: nếu khung chứa THẬT SỰ đổi kích thước về sau
+        // (bottom sheet mở rộng, xoay màn hình, đổi vh trên mobile...), tự
+        // resize() lại theo.
         if (typeof ResizeObserver !== "undefined") {
-          resizeObserver = new ResizeObserver(safeResize);
+          resizeObserver = new ResizeObserver(() => safeResize("observer"));
           resizeObserver.observe(containerRef.current);
         }
       })
