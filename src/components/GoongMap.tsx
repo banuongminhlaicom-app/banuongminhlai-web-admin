@@ -394,29 +394,31 @@ export function GoongMap({
     return <MapPreview className={className} {...fallbackProps} />;
   }
 
-  const mapEl = <div ref={containerRef} className={cn("bg-muted", className)} />;
-  if (!navigate) return mapEl;
-
+  // CẤU TRÚC ỔN ĐỊNH: luôn là wrapper (nhận className vị trí/kích thước) chứa 1
+  // div bản đồ cố định + nút định vị (chỉ hiện khi navigate). Trước đây cây JSX
+  // gốc đổi hình khi navigate bật/tắt (going_to_pickup -> arrived) khiến React
+  // tháo/gắn lại div chứa bản đồ, mapbox mất container rồi ném lỗi trong effect
+  // -> TRẮNG MÀN. Giữ container không đổi vị trí trong cây để tránh hẳn lỗi đó.
+  // Div bản đồ KHÔNG có React child (để mapbox tự quản canvas); nút định vị là
+  // anh em, neo theo wrapper đã positioned.
   return (
-    // className (vị trí/kích thước bản đồ) đã nằm trên mapEl bên trong; wrapper
-    // này chỉ cần lấp đầy đúng chỗ đó để làm điểm neo cho nút định vị — dùng
-    // style trực tiếp thay vì class Tailwind để tránh twMerge xung đột với các
-    // class position (absolute/relative) mà caller đã đặt trên mapEl.
-    <div style={{ position: "relative", height: "100%", width: "100%" }}>
-      {mapEl}
-      <button
-        type="button"
-        onClick={handleRecenter}
-        aria-label={autoTracking ? "Đang bám theo vị trí xe" : "Về lại vị trí xe"}
-        className={cn(
-          "absolute bottom-28 right-4 z-10 grid h-12 w-12 place-items-center rounded-full shadow-elevated transition-colors active:scale-95",
-          autoTracking
-            ? "gradient-primary text-primary-foreground"
-            : "bg-surface text-muted-foreground",
-        )}
-      >
-        <LocateFixed className="h-5 w-5" />
-      </button>
+    <div className={cn("relative", className)}>
+      <div ref={containerRef} className="absolute inset-0 bg-muted" />
+      {navigate && (
+        <button
+          type="button"
+          onClick={handleRecenter}
+          aria-label={autoTracking ? "Đang bám theo vị trí xe" : "Về lại vị trí xe"}
+          className={cn(
+            "absolute bottom-28 right-4 z-10 grid h-12 w-12 place-items-center rounded-full shadow-elevated transition-colors active:scale-95",
+            autoTracking
+              ? "gradient-primary text-primary-foreground"
+              : "bg-surface text-muted-foreground",
+          )}
+        >
+          <LocateFixed className="h-5 w-5" />
+        </button>
+      )}
     </div>
   );
 }
