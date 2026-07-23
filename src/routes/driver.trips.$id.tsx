@@ -545,6 +545,7 @@ function DriverTripDetail() {
         <TripChat
           tripId={trip.id}
           selfId={driverId}
+          role="driver"
           peerName={customer?.full_name ?? "Khách hàng"}
           onClose={() => setChatOpen(false)}
         />

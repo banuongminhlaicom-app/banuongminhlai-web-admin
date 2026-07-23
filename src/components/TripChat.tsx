@@ -11,17 +11,36 @@ import {
 import { formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+// Mẫu tin nhắn bấm nhanh — khác nhau theo vai trò. Dịch vụ "uống mình lái" nên
+// tài xế là người tới chỗ khách; câu chữ theo đúng ngữ cảnh đó.
+const QUICK_REPLIES: Record<"driver" | "customer", string[]> = {
+  driver: [
+    "Tôi đang trên đường đến đón bạn, sẽ tới trong ít phút nữa.",
+    "Tôi đã đến điểm đón, bạn ra giúp mình nhé.",
+    "Bạn đang đứng ở đâu để mình tiện đón?",
+    "Đường hơi kẹt, mình tới trễ vài phút, mong bạn thông cảm.",
+  ],
+  customer: [
+    "Tôi đang chờ bạn ở điểm đón nha.",
+    "Tôi ra ngay đây, chờ mình chút nhé.",
+    "Bạn tới điểm đón chưa?",
+    "Cho mình thêm ít phút nhé.",
+  ],
+};
+
 // Khung chat trong chuyến, dùng chung cho cả màn khách và màn tài xế. Tin nhắn
 // realtime qua Supabase (subscribeTripMessages) + polling 8s dự phòng nếu
 // WebSocket lỡ sự kiện. `selfId` để phân biệt bong bóng của mình vs của đối phương.
 export function TripChat({
   tripId,
   selfId,
+  role,
   peerName,
   onClose,
 }: {
   tripId: string;
   selfId: string;
+  role: "driver" | "customer";
   peerName: string;
   onClose: () => void;
 }) {
@@ -52,13 +71,13 @@ export function TripChat({
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages]);
 
-  const send = async () => {
-    const text = draft.trim();
+  const send = async (raw?: string) => {
+    const text = (raw ?? draft).trim();
     if (!text || sending) return;
     setSending(true);
     try {
       await sendTripMessage(tripId, selfId, text);
-      setDraft("");
+      if (raw == null) setDraft("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Không gửi được tin nhắn.");
     } finally {
@@ -122,7 +141,21 @@ export function TripChat({
           )}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-border px-3 py-3">
+        {/* Mẫu tin nhắn bấm nhanh — cuộn ngang, bấm là gửi luôn. */}
+        <div className="flex gap-2 overflow-x-auto border-t border-border px-3 pt-3 pb-1">
+          {QUICK_REPLIES[role].map((q) => (
+            <button
+              key={q}
+              onClick={() => send(q)}
+              disabled={sending}
+              className="shrink-0 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-foreground disabled:opacity-50"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 px-3 pb-3 pt-2">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -133,7 +166,7 @@ export function TripChat({
             className="h-11 flex-1 rounded-full border border-border bg-surface px-4 text-sm outline-none focus:border-primary"
           />
           <button
-            onClick={send}
+            onClick={() => send()}
             disabled={sending || !draft.trim()}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full gradient-primary text-primary-foreground shadow-glow disabled:opacity-50"
             aria-label="Gửi"

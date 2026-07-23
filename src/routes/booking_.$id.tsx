@@ -335,6 +335,7 @@ function RealBookingDetail({ id }: { id: string }) {
         <TripChat
           tripId={id}
           selfId={trip.customer_id}
+          role="customer"
           peerName={driver?.full_name ?? "Tài xế"}
           onClose={() => setChatOpen(false)}
         />
