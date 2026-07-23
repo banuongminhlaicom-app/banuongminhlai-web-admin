@@ -1,7 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bell, MapPin, Search, ShieldAlert, Zap, CalendarClock, Loader2 } from "lucide-react";
+import {
+  Bell,
+  ChevronRight,
+  MapPin,
+  Navigation,
+  Search,
+  ShieldAlert,
+  Zap,
+  CalendarClock,
+  Loader2,
+} from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { MapPreview } from "@/components/MapPreview";
 import { EmergencyButton } from "@/components/EmergencyButton";
@@ -9,7 +19,15 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LocationPermissionCard } from "@/components/LocationPermissionCard";
 import { useAuthState, useRequireRole } from "@/lib/auth";
-import { getAddresses } from "@/lib/queries";
+import { getActiveCustomerTrip, getAddresses, type TripStatusDb } from "@/lib/queries";
+
+const ACTIVE_TRIP_STATUS_LABEL: Partial<Record<TripStatusDb, string>> = {
+  searching: "Đang tìm tài xế…",
+  accepted: "Tài xế đã nhận chuyến",
+  arriving: "Tài xế đang tới đón bạn",
+  arrived: "Tài xế đã tới điểm đón",
+  in_progress: "Đang trên đường tới",
+};
 
 export const Route = createFileRoute("/home")({
   head: () => ({ meta: [{ title: "Trang chủ — Bạn Uống Mình Lái" }] }),
@@ -26,6 +44,15 @@ function HomeScreen() {
     queryKey: ["addresses", userId],
     queryFn: () => getAddresses(userId!),
     enabled: !!userId,
+  });
+
+  // Chuyến đang hoạt động (chưa hoàn thành/huỷ) — để khách quay lại Home giữa
+  // chừng vẫn thấy và bấm vào tiếp tục theo dõi, không bị "mất dấu" chuyến.
+  const { data: activeTrip } = useQuery({
+    queryKey: ["active-trip", userId],
+    queryFn: () => getActiveCustomerTrip(userId!),
+    enabled: !!userId,
+    refetchInterval: 8000,
   });
 
   const goBook = (to: "/booking" | "/schedule") => {
@@ -57,6 +84,30 @@ function HomeScreen() {
       <div className="px-4 pb-2">
         <LocationPermissionCard role="customer" />
       </div>
+
+      {/* Chuyến đang hoạt động — nổi bật ngay đầu trang để khách không mất dấu
+          chuyến khi lỡ bấm về Home giữa lúc đang chờ/đang đi. */}
+      {activeTrip && (
+        <div className="px-4 pb-2">
+          <button
+            onClick={() => navigate({ to: "/booking/$id", params: { id: activeTrip.id } })}
+            className="flex w-full items-center gap-3 rounded-2xl gradient-primary p-3.5 text-left text-primary-foreground shadow-glow"
+          >
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/20">
+              <Navigation className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] font-semibold uppercase tracking-wide opacity-90">
+                {ACTIVE_TRIP_STATUS_LABEL[activeTrip.status] ?? "Chuyến đang hoạt động"}
+              </span>
+              <span className="block truncate text-[13px] font-bold">
+                {activeTrip.dropoff_address}
+              </span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 opacity-90" />
+          </button>
+        </div>
+      )}
 
       {/* Map with floating bottom sheet */}
       <section className="relative px-4">

@@ -173,6 +173,25 @@ export async function rateTrip(id: string, rating: number, feedback: string): Pr
   if (error) throw error;
 }
 
+// Chuyến đang hoạt động của khách (chưa hoàn thành/huỷ) — để hiện lại trên
+// trang chủ, tránh mất dấu chuyến khi khách bấm về Home giữa chừng.
+// Dùng chung ACTIVE_TRIP_STATUSES định nghĩa bên dưới (admin dashboard).
+export async function getActiveCustomerTrip(customerId: string): Promise<TripRow | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("trips")
+    .select(
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+    )
+    .eq("customer_id", customerId)
+    .in("status", ACTIVE_TRIP_STATUSES)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export function subscribeTripStatus(id: string, onUpdate: (trip: TripRow) => void): () => void {
   if (!supabase) return () => {};
   const client = supabase;
