@@ -137,8 +137,21 @@ export function GoongMap({
           zoom: p.navigate ? 18 : 14,
           pitch: 0,
         });
+        // Đã xác minh qua thực nghiệm: khung chứa (flex-1/h-full) luôn ĐÚNG
+        // kích thước ngay từ đầu — ResizeObserver không bao giờ bắn vì kích
+        // thước khung KHÔNG đổi. Lỗi thật là canvas WebGL của goong-js tự đo
+        // sai kích thước đúng lúc dựng (trước khi trình duyệt kịp layout xong
+        // cây flex cha, do map dựng trong .then() bất đồng bộ), rồi giữ
+        // nguyên mãi vì không có gì kích nó đo lại. Ép resize() ngay sau khi
+        // dựng + sau "load" (2 mốc thời điểm khác nhau) để chắc chắn bắt được
+        // lúc container đã layout xong.
+        map.resize();
+        requestAnimationFrame(() => {
+          if (!disposed) map.resize();
+        });
         map.on("load", () => {
           readyRef.current = true;
+          map.resize();
           syncMap(goongjs, map);
         });
         // Chỉ dùng "dragstart" để phát hiện thao tác tự do của người dùng —
@@ -150,12 +163,10 @@ export function GoongMap({
         map.on("dragstart", () => setAutoTracking(false));
         mapRef.current = map;
 
-        // Bản đồ khởi tạo với canvas nhỏ mặc định nếu container chưa có kích
-        // thước thật lúc đó (CSS của goong-js.css tải bất đồng bộ, chưa kịp
-        // load xong khi Map() dựng canvas; hoặc trình duyệt di động đổi lại
-        // đơn vị vh khi thanh địa chỉ ẩn/hiện). ResizeObserver theo dõi khung
-        // chứa thật, gọi resize() lại mỗi khi kích thước đổi — vá đúng lỗi bản
-        // đồ bị co nhỏ lại, còn lại khoảng trắng/xám phía dưới.
+        // Vẫn giữ ResizeObserver làm lớp phòng vệ thứ 2: nếu khung chứa THẬT
+        // SỰ đổi kích thước sau này (trình duyệt di động ẩn/hiện thanh địa chỉ
+        // làm đổi vh, xoay màn hình...), tự resize() lại theo, không chỉ dựa
+        // vào 2 lần gọi ép ở trên.
         if (typeof ResizeObserver !== "undefined") {
           resizeObserver = new ResizeObserver(() => map.resize());
           resizeObserver.observe(containerRef.current);
