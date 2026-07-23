@@ -164,45 +164,27 @@ export function GoongMap({
         // cùng → canvas bị đo nhỏ rồi kẹt luôn. Gọi resize() ở NHIỀU mốc thời
         // gian để chắc chắn có ít nhất một lần rơi vào lúc layout đã ổn định.
         // (Trang khách dùng h-[55vh] cố định nên không dính lỗi này.)
-        let chainLogged = false;
-        const safeResize = (tag: string) => {
+        const safeResize = () => {
           try {
-            const el = containerRef.current;
-            // Log tạm thời để chẩn đoán: container 430x150 ở mọi mốc -> tổ tiên
-            // nào đó cao 150px. In cả chuỗi cha để tìm đúng chỗ collapse.
-            console.log(
-              `[GoongMap] resize(${tag}) container=${el?.clientWidth}x${el?.clientHeight}`,
-            );
-            if (!chainLogged && el) {
-              chainLogged = true;
-              const chain: string[] = [];
-              let node: HTMLElement | null = el;
-              for (let i = 0; node && i < 8; i++) {
-                const cs = getComputedStyle(node);
-                chain.push(
-                  `${node.tagName}.${(node.className || "").toString().slice(0, 30)} h=${node.clientHeight} pos=${cs.position} display=${cs.display}`,
-                );
-                node = node.parentElement;
-              }
-              console.log("[GoongMap] chain:\n" + chain.join("\n"));
-            }
             map.resize();
           } catch (err) {
             console.error("GoongMap: resize() lỗi", err);
           }
         };
-        [0, 150, 400, 800, 1200].forEach((ms) => {
+        // Ép resize() ở vài mốc + sau "load" để bắt lúc layout ổn định (khung
+        // flex-1 của trang tài xế phụ thuộc chiều cao bottom sheet).
+        [0, 200, 600].forEach((ms) => {
           window.setTimeout(() => {
-            if (!disposed) safeResize(`t${ms}`);
+            if (!disposed) safeResize();
           }, ms);
         });
-        map.on("load", () => safeResize("load"));
+        map.on("load", safeResize);
 
         // Lớp phòng vệ liên tục: nếu khung chứa THẬT SỰ đổi kích thước về sau
         // (bottom sheet mở rộng, xoay màn hình, đổi vh trên mobile...), tự
         // resize() lại theo.
         if (typeof ResizeObserver !== "undefined") {
-          resizeObserver = new ResizeObserver(() => safeResize("observer"));
+          resizeObserver = new ResizeObserver(safeResize);
           resizeObserver.observe(containerRef.current);
         }
       })
@@ -461,7 +443,12 @@ export function GoongMap({
   // anh em, neo theo wrapper đã positioned.
   return (
     <div className={cn("relative", className)}>
-      <div ref={containerRef} className="absolute inset-0 bg-muted" />
+      {/* Div bản đồ dùng h-full w-full (lấp đầy wrapper bằng chiều cao/rộng)
+          thay vì absolute inset-0: goong-js/mapbox chèn class + reset position
+          lên chính div này khi khởi tạo, làm inset-0 mất tác dụng và canvas rơi
+          về chiều cao mặc định 150px. h-full không phụ thuộc position nên tránh
+          hẳn xung đột đó. */}
+      <div ref={containerRef} className="h-full w-full bg-muted" />
       {navigate && (
         <button
           type="button"
