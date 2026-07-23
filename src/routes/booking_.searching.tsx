@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { MapPreview } from "@/components/MapPreview";
+import { GoongMap } from "@/components/GoongMap";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useRequireRole } from "@/lib/auth";
 import { cancelTrip, getTrip, subscribeTripStatus } from "@/lib/queries";
@@ -74,7 +74,14 @@ function Searching() {
 
   return (
     <div className="relative mx-auto min-h-screen max-w-md bg-background">
-      <MapPreview className="absolute inset-0 h-full w-full" />
+      <GoongMap
+        className="absolute inset-0 h-full w-full"
+        pickup={
+          trip?.pickup_lat != null && trip?.pickup_lng != null
+            ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+            : null
+        }
+      />
       <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background" />
 
       <div className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-5 py-3">

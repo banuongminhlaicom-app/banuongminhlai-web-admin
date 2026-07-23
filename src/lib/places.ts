@@ -43,7 +43,7 @@ interface GoongPrediction {
 // Gõ lùi/gõ lại cùng một chuỗi sẽ lấy từ cache, không tốn thêm lượt gọi.
 export async function fetchPlaceSuggestions(input: string): Promise<PlaceSuggestion[]> {
   const query = input.trim();
-  if (!isMapConfigured || query.length < 2) return [];
+  if (!isMapConfigured || query.length < 3) return [];
 
   // Chuẩn hoá key để "Chợ Cao Lãnh" và "chợ  cao lãnh" dùng chung một cache.
   const cacheKey = `ac:${query.toLowerCase().replace(/\s+/g, " ")}`;

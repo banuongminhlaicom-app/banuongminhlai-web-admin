@@ -162,7 +162,7 @@ function Booking() {
       } catch {
         setSuggestions([]);
       }
-    }, 250);
+    }, 400);
   }
 
   async function selectSuggestion(suggestion: PlaceSuggestion, isPickup: boolean) {
