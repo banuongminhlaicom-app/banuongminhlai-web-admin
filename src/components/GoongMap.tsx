@@ -164,13 +164,28 @@ export function GoongMap({
         // cùng → canvas bị đo nhỏ rồi kẹt luôn. Gọi resize() ở NHIỀU mốc thời
         // gian để chắc chắn có ít nhất một lần rơi vào lúc layout đã ổn định.
         // (Trang khách dùng h-[55vh] cố định nên không dính lỗi này.)
+        let chainLogged = false;
         const safeResize = (tag: string) => {
           try {
             const el = containerRef.current;
-            // Log tạm thời để chẩn đoán nếu vẫn lỗi: xem container thật cao bao nhiêu.
+            // Log tạm thời để chẩn đoán: container 430x150 ở mọi mốc -> tổ tiên
+            // nào đó cao 150px. In cả chuỗi cha để tìm đúng chỗ collapse.
             console.log(
               `[GoongMap] resize(${tag}) container=${el?.clientWidth}x${el?.clientHeight}`,
             );
+            if (!chainLogged && el) {
+              chainLogged = true;
+              const chain: string[] = [];
+              let node: HTMLElement | null = el;
+              for (let i = 0; node && i < 8; i++) {
+                const cs = getComputedStyle(node);
+                chain.push(
+                  `${node.tagName}.${(node.className || "").toString().slice(0, 30)} h=${node.clientHeight} pos=${cs.position} display=${cs.display}`,
+                );
+                node = node.parentElement;
+              }
+              console.log("[GoongMap] chain:\n" + chain.join("\n"));
+            }
             map.resize();
           } catch (err) {
             console.error("GoongMap: resize() lỗi", err);
