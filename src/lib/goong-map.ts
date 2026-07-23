@@ -38,6 +38,7 @@ export interface GoongMapInstance {
   flyTo(options: Record<string, unknown>): void;
   getPitch(): number;
   isStyleLoaded(): boolean;
+  resize(): void;
 }
 
 interface GoongJs {

@@ -119,6 +119,7 @@ export function GoongMap({
   useEffect(() => {
     if (!isGoongMapConfigured || !containerRef.current) return;
     let disposed = false;
+    let resizeObserver: ResizeObserver | null = null;
 
     loadGoongMapSdk()
       .then((goongjs) => {
@@ -148,6 +149,17 @@ export function GoongMap({
         // muốn rồi làm camera đứng yên ở góc phẳng — bỏ hẳn cho chắc.
         map.on("dragstart", () => setAutoTracking(false));
         mapRef.current = map;
+
+        // Bản đồ khởi tạo với canvas nhỏ mặc định nếu container chưa có kích
+        // thước thật lúc đó (CSS của goong-js.css tải bất đồng bộ, chưa kịp
+        // load xong khi Map() dựng canvas; hoặc trình duyệt di động đổi lại
+        // đơn vị vh khi thanh địa chỉ ẩn/hiện). ResizeObserver theo dõi khung
+        // chứa thật, gọi resize() lại mỗi khi kích thước đổi — vá đúng lỗi bản
+        // đồ bị co nhỏ lại, còn lại khoảng trắng/xám phía dưới.
+        if (typeof ResizeObserver !== "undefined") {
+          resizeObserver = new ResizeObserver(() => map.resize());
+          resizeObserver.observe(containerRef.current);
+        }
       })
       .catch(() => {
         // Không tải được SDK — giữ nguyên khung trống, fallback bên dưới lo phần hiển thị.
@@ -156,6 +168,7 @@ export function GoongMap({
     return () => {
       disposed = true;
       readyRef.current = false;
+      resizeObserver?.disconnect();
       Object.values(markersRef.current).forEach((m) => m.remove());
       markersRef.current = {};
       mapRef.current?.remove();
