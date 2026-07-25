@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { MobileShell } from "@/components/MobileShell";
-import { MOCK_TRIPS, TRIP_STATUS_LABEL, type TripStatus } from "@/lib/mock";
+import { TRIP_STATUS_LABEL, type TripStatus } from "@/lib/mock";
+import { getTrips } from "@/lib/queries";
+import { useAuthState, useRequireRole } from "@/lib/auth";
 import { formatKm, formatVND } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useRequireRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/trips")({
   head: () => ({ meta: [{ title: "Chuyến đi" }] }),
@@ -25,8 +27,19 @@ const TABS = [
 
 function TripsScreen() {
   useRequireRole("customer");
+  const authState = useAuthState();
+  const userId = authState.session?.user.id;
   const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("history");
-  const filtered = MOCK_TRIPS.filter((t) => TABS.find((x) => x.key === tab)!.filter(t.status));
+
+  const { data: trips = [], isLoading } = useQuery({
+    queryKey: ["trips", userId],
+    queryFn: () => getTrips(userId!),
+    enabled: !!userId,
+  });
+
+  const filtered = trips.filter((t) =>
+    TABS.find((x) => x.key === tab)!.filter(t.status as TripStatus),
+  );
 
   return (
     <MobileShell>
@@ -52,7 +65,9 @@ function TripsScreen() {
       </div>
 
       <div className="mt-4 space-y-2 px-5">
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <div className="mt-16 text-center text-sm text-muted-foreground">Đang tải...</div>
+        ) : filtered.length === 0 ? (
           <div className="mt-16 text-center">
             <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl bg-surface text-3xl">
               📭
@@ -73,7 +88,7 @@ function TripsScreen() {
             <Link
               key={t.id}
               to="/booking/$id"
-              params={{ id: t.code.replace("BUML-", "") }}
+              params={{ id: t.id }}
               className="block rounded-3xl bg-surface p-4"
             >
               <div className="flex items-start justify-between">
@@ -86,7 +101,7 @@ function TripsScreen() {
                     !["completed", "cancelled"].includes(t.status) && "bg-primary/20 text-primary",
                   )}
                 >
-                  {TRIP_STATUS_LABEL[t.status]}
+                  {TRIP_STATUS_LABEL[t.status as TripStatus]}
                 </span>
               </div>
               <div className="mt-2 flex items-start gap-2">
@@ -96,13 +111,13 @@ function TripsScreen() {
                   <div className="h-2 w-2 rounded-full bg-success" />
                 </div>
                 <div className="min-w-0 flex-1 text-sm">
-                  <div className="truncate font-semibold">{t.pickup}</div>
-                  <div className="mt-1 truncate font-semibold">{t.destination}</div>
+                  <div className="truncate font-semibold">{t.pickup_address}</div>
+                  <div className="mt-1 truncate font-semibold">{t.dropoff_address}</div>
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs">
                 <span className="text-muted-foreground">
-                  {formatKm(t.distanceKm)} · {t.vehicleType}
+                  {t.distance_km != null ? formatKm(t.distance_km) : "—"} · {t.vehicle_type}
                 </span>
                 <span className="text-base font-black text-primary">{formatVND(t.price)}</span>
               </div>

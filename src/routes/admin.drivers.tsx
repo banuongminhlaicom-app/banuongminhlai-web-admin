@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
@@ -83,12 +83,13 @@ function AdminDrivers() {
                 </div>
               </div>
               <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => toast("Đã mở hồ sơ chi tiết")}
-                  className="flex-1 rounded-xl bg-background py-2 text-xs font-bold"
+                <Link
+                  to="/admin/drivers/$id"
+                  params={{ id: d.id }}
+                  className="flex-1 rounded-xl bg-background py-2 text-center text-xs font-bold"
                 >
                   Chi tiết
-                </button>
+                </Link>
                 <button
                   onClick={() => approveMutation.mutate({ id: d.id, approved: !d.approved })}
                   disabled={approveMutation.isPending}

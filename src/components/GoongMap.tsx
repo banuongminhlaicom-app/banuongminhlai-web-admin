@@ -136,6 +136,7 @@ export function GoongMap({
           center: [center.lng, center.lat],
           zoom: p.navigate ? 18 : 14,
           pitch: 0,
+          attributionControl: false,
         });
 
         // Đăng ký listener + gán ref TRƯỚC MỌI THỨ KHÁC — đây là phần bắt buộc
@@ -361,7 +362,10 @@ export function GoongMap({
       return;
     }
 
-    // Chế độ thường: căn khung nhìn ôm trọn các điểm đang có.
+    // Chế độ thường: căn khung nhìn ôm trọn các điểm đang có. Chỉ 1 điểm (vd.
+    // vừa bấm nút định vị, chưa chọn điểm đến) thì bay thẳng tới điểm đó thay
+    // vì đứng yên — trước đây chỉ xử lý khi có >= 2 điểm nên bấm định vị không
+    // di chuyển camera dù marker đã đổi vị trí.
     const points = [pickup, dropoff, driver].filter((c): c is Coord => !!c);
     if (points.length >= 2) {
       const bounds = new goongjs.LngLatBounds(
@@ -370,6 +374,8 @@ export function GoongMap({
       );
       points.forEach((c) => bounds.extend([c.lng, c.lat]));
       map.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 600 });
+    } else if (points.length === 1) {
+      map.easeTo({ center: [points[0].lng, points[0].lat], zoom: 15, duration: 600 });
     }
   }
 

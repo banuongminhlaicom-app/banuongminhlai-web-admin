@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // app.localhost tự trỏ về 127.0.0.1 và được Chromium coi là secure context
+  // (nên Geolocation API hoạt động, khác với lvh.me/http thường bị chặn).
+  // Vẫn cần domain có dấu chấm để qua validation của Goong Maps API key.
+  vite: {
+    server: { allowedHosts: ["app.localhost"] },
+  },
 });

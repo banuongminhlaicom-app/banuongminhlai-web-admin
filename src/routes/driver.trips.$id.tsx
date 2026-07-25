@@ -19,6 +19,7 @@ import {
 import { toast } from "sonner";
 import { useLocationTracking } from "@/hooks/use-location-tracking";
 import { useWakeLock } from "@/hooks/use-wake-lock";
+import { useTripChatAlerts } from "@/hooks/use-trip-chat-alerts";
 import { GoongMap } from "@/components/GoongMap";
 import { TripChat } from "@/components/TripChat";
 import { fetchRoute, haversineKm } from "@/lib/places";
@@ -89,6 +90,14 @@ function DriverTripDetail() {
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  // Báo có tin nhắn mới từ khách (âm thanh + toast + badge) khi tài xế không
+  // đang mở sẵn khung chat — để không bỏ lỡ dù đang xem bản đồ/dẫn đường.
+  const { unreadCount: chatUnread } = useTripChatAlerts({
+    tripId: id,
+    selfId: driverId ?? null,
+    peerName: customer?.full_name ?? "Khách hàng",
+    chatOpen,
+  });
 
   // Gọi khách bằng số điện thoại thật (mở app điện thoại của máy — miễn phí).
   const callCustomer = () => {
@@ -190,6 +199,11 @@ function DriverTripDetail() {
   const currentStep = steps?.[stepIndex] ?? null;
   const stepDistanceM =
     livePos && currentStep ? Math.round(haversineKm(livePos, currentStep.end) * 1000) : null;
+  // Goong/Google Directions: maneuver + instruction của 1 step mô tả cú rẽ để
+  // BẮT ĐẦU step đó (đã rẽ xong), không phải cú rẽ SẮP tới ở cuối step hiện
+  // tại. Cú rẽ sắp tới thật sự nằm ở step KẾ TIẾP — currentStep chỉ dùng để
+  // tính khoảng cách còn lại tới điểm rẽ đó.
+  const upcomingStep = steps?.[stepIndex + 1] ?? currentStep;
 
   // Khoảng cách còn lại tới đích: ưu tiên số liệu tuyến thật (đường bộ), rơi về
   // đường chim bay × 1.3 nếu tuyến chưa tính xong.
@@ -284,7 +298,7 @@ function DriverTripDetail() {
         {/* Turn-by-turn badge (góc trên trái): nền đen, icon rẽ + khoảng cách */}
         <div className="safe-top pointer-events-none absolute inset-x-0 top-0 flex items-start gap-2 px-3 pt-3">
           <div className="flex items-center gap-2 rounded-2xl bg-[#111827] px-3 py-2 text-white shadow-elevated">
-            <ManeuverIcon maneuver={currentStep?.maneuver ?? null} className="h-6 w-6" />
+            <ManeuverIcon maneuver={upcomingStep?.maneuver ?? null} className="h-6 w-6" />
             <span className="text-xl font-black leading-none">
               {currentStep && stepDistanceM != null
                 ? stepDistanceM < 1000
@@ -293,9 +307,9 @@ function DriverTripDetail() {
                 : "—"}
             </span>
           </div>
-          {currentStep?.instruction && (
+          {upcomingStep?.instruction && (
             <div className="max-w-[52%] truncate rounded-2xl bg-[#1d4ed8] px-3 py-2 text-xs font-bold text-white shadow-elevated">
-              {currentStep.instruction}
+              {upcomingStep.instruction}
             </div>
           )}
         </div>
@@ -327,7 +341,7 @@ function DriverTripDetail() {
             className="flex items-center justify-end gap-1 text-[#374151]"
           >
             <RouteIcon className="h-4 w-4" />
-            <span className="text-xs font-semibold">Tổng quan</span>
+            <span className="text-xs font-semibold">Chi tiết chuyến</span>
           </button>
         </div>
 
@@ -347,7 +361,12 @@ function DriverTripDetail() {
 
         {/* Row 3: thanh công cụ (4 cột, có vạch chia) */}
         <div className="grid grid-cols-4 border-t border-[#e5e7eb]">
-          <ToolCell Icon={MessageSquare} label="Chat" onClick={() => setChatOpen(true)} />
+          <ToolCell
+            Icon={MessageSquare}
+            label="Chat"
+            badge={chatUnread}
+            onClick={() => setChatOpen(true)}
+          />
           <ToolCell Icon={Phone} label="Gọi khách" onClick={callCustomer} divider />
           <ToolCell
             Icon={LifeBuoy}
@@ -393,7 +412,7 @@ function DriverTripDetail() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-base font-black">Tổng quan chuyến đi</h3>
+              <h3 className="text-base font-black">Chi tiết chuyến đi</h3>
               <button
                 onClick={() => setSheetExpanded(false)}
                 className="grid h-8 w-8 place-items-center rounded-full bg-surface"
@@ -427,9 +446,14 @@ function DriverTripDetail() {
                   </button>
                   <button
                     onClick={() => setChatOpen(true)}
-                    className="grid h-10 w-10 place-items-center rounded-full bg-background"
+                    className="relative grid h-10 w-10 place-items-center rounded-full bg-background"
                     aria-label="Nhắn tin"
                   >
+                    {!!chatUnread && (
+                      <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
+                        {chatUnread > 9 ? "9+" : chatUnread}
+                      </span>
+                    )}
                     <MessageSquare className="h-4 w-4" />
                   </button>
                 </div>
@@ -572,20 +596,27 @@ function ToolCell({
   Icon,
   onClick,
   divider,
+  badge,
 }: {
   label: string;
   Icon: typeof Phone;
   onClick: () => void;
   divider?: boolean;
+  badge?: number;
 }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-1 px-1 py-3 text-[11px] font-medium text-[#374151]",
+        "relative flex flex-col items-center gap-1 px-1 py-3 text-[11px] font-medium text-[#374151]",
         divider && "border-l border-[#e5e7eb]",
       )}
     >
+      {!!badge && (
+        <span className="absolute right-2 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
       <Icon className="h-5 w-5 text-[#111827]" />
       <span className="text-center leading-tight">{label}</span>
     </button>

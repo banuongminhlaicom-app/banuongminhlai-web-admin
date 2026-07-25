@@ -18,6 +18,7 @@ import {
 } from "@/lib/queries";
 import { GoongMap } from "@/components/GoongMap";
 import { TripChat } from "@/components/TripChat";
+import { useTripChatAlerts } from "@/hooks/use-trip-chat-alerts";
 import { fetchRoute } from "@/lib/places";
 import { formatKm, formatMinutes, formatRelativeTime, formatVND } from "@/lib/format";
 
@@ -113,6 +114,14 @@ function RealBookingDetail({ id }: { id: string }) {
   }, [trip?.status, id, navigate]);
 
   const [chatOpen, setChatOpen] = useState(false);
+  // Báo có tin nhắn mới từ tài xế (âm thanh + toast + badge) khi khách không
+  // đang mở sẵn khung chat — để không bỏ lỡ dù đang xem màn khác.
+  const { unreadCount: chatUnread } = useTripChatAlerts({
+    tripId: id,
+    selfId: trip?.customer_id ?? null,
+    peerName: driver?.full_name ?? "Tài xế",
+    chatOpen,
+  });
 
   // Gọi tài xế bằng số thật (mở app điện thoại của máy — miễn phí).
   const callDriver = () => {
@@ -173,29 +182,36 @@ function RealBookingDetail({ id }: { id: string }) {
 
   return (
     <div className="relative mx-auto min-h-screen max-w-md bg-background">
-      <GoongMap
-        className="h-[55vh] w-full"
-        pickup={
-          trip.pickup_lat != null && trip.pickup_lng != null
-            ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
-            : null
-        }
-        dropoff={
-          trip.dropoff_lat != null && trip.dropoff_lng != null
-            ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
-            : null
-        }
-        driver={driverLocation ? { lat: driverLocation.lat, lng: driverLocation.lng } : null}
-        routePolyline={route?.polyline}
-        fallbackProps={{ showRoute: true, driverPin: true }}
-      />
+      {/* overflow-hidden + relative: khoá pill "Vị trí xe" LUÔN nằm trong vùng
+          bản đồ (55vh), không lệ thuộc phép tính "-mt" theo viewport như trước
+          (từng đè lên khung bottom sheet vì khung đó cũng tự kéo lên -mt-8). */}
+      <div className="relative h-[55vh] w-full overflow-hidden">
+        <GoongMap
+          className="absolute inset-0 h-full w-full"
+          pickup={
+            trip.pickup_lat != null && trip.pickup_lng != null
+              ? { lat: trip.pickup_lat, lng: trip.pickup_lng }
+              : null
+          }
+          dropoff={
+            trip.dropoff_lat != null && trip.dropoff_lng != null
+              ? { lat: trip.dropoff_lat, lng: trip.dropoff_lng }
+              : null
+          }
+          driver={driverLocation ? { lat: driverLocation.lat, lng: driverLocation.lng } : null}
+          routePolyline={route?.polyline}
+          fallbackProps={{ showRoute: true, driverPin: true }}
+        />
 
-      {/* Cho khách biết vị trí xe còn mới hay đã cũ. Quan trọng vì khi tài xế mở
-          Google Maps chỉ đường, trình duyệt bị treo nền và ngừng gửi vị trí —
-          không có dòng này khách dễ tưởng xe đứng yên hoặc app hỏng. */}
-      {tripActive && driverLocation?.updatedAt && (
-        <LocationFreshness updatedAt={driverLocation.updatedAt} />
-      )}
+        {/* Cho khách biết vị trí xe còn mới hay đã cũ. Quan trọng vì khi tài xế
+            mở Google Maps chỉ đường, trình duyệt bị treo nền và ngừng gửi vị
+            trí — không có dòng này khách dễ tưởng xe đứng yên hoặc app hỏng.
+            bottom-9 (36px): sát đáy bản đồ nhưng vẫn nằm TRÊN mép khung bottom
+            sheet (khung đó đè lên 32px) nên không bị che. */}
+        {tripActive && driverLocation?.updatedAt && (
+          <LocationFreshness updatedAt={driverLocation.updatedAt} />
+        )}
+      </div>
 
       <div className="safe-top absolute inset-x-0 top-0 flex items-center justify-between px-5 py-3">
         <button
@@ -212,7 +228,10 @@ function RealBookingDetail({ id }: { id: string }) {
       <div className="-mt-8 rounded-t-3xl bg-background px-5 pt-5 pb-32">
         <div
           className={cn(
-            "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold",
+            // mt-2: thêm đệm trên riêng cho badge này — mép trên khung bottom
+            // sheet đè lên bản đồ (-mt-8) nên badge cần chừa thêm chỗ mới thấy
+            // rõ, tách biệt với padding chung pt-5 của cả khung.
+            "mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold",
             isFinal ? "bg-success/20 text-success" : "bg-primary/20 text-primary",
           )}
         >
@@ -257,6 +276,7 @@ function RealBookingDetail({ id }: { id: string }) {
                 <ActionBtn
                   Icon={MessageSquare}
                   label="Nhắn tin"
+                  badge={chatUnread}
                   onClick={() => setChatOpen(true)}
                 />
                 <ActionBtn
@@ -427,7 +447,11 @@ function LocationFreshness({ updatedAt }: { updatedAt: string }) {
   return (
     <div
       className={cn(
-        "absolute inset-x-0 top-[55vh] -mt-9 px-5 text-[11px]",
+        // Neo theo "bottom" của khung bản đồ (cha có overflow-hidden, cao cố
+        // định 55vh) thay vì tính "top-[55vh] -mt-X" theo viewport — cách cũ dễ
+        // lệch/đè lên khung bottom sheet vì khung đó cũng tự kéo lên (-mt-8).
+        // bottom-9 (36px): sát đáy bản đồ, vẫn trên mép sheet (sheet đè 32px).
+        "absolute inset-x-0 bottom-9 px-5 text-[11px]",
         stale ? "text-warning" : "text-muted-foreground",
       )}
     >
@@ -593,20 +617,27 @@ function ActionBtn({
   label,
   onClick,
   tone,
+  badge,
 }: {
   Icon: typeof Phone;
   label: string;
   onClick: () => void;
   tone?: "danger";
+  badge?: number;
 }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-1 rounded-2xl bg-background py-3 text-xs font-bold",
+        "relative flex flex-col items-center gap-1 rounded-2xl bg-background py-3 text-xs font-bold",
         tone === "danger" && "bg-destructive/15 text-destructive",
       )}
     >
+      {!!badge && (
+        <span className="absolute right-3 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[10px] font-black text-destructive-foreground">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
       <Icon className="h-4 w-4" />
       {label}
     </button>

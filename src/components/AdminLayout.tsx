@@ -5,6 +5,7 @@ import {
   Gauge,
   Headphones,
   LayoutGrid,
+  MapPin,
   Route as RouteIcon,
   Tag,
   Users,
@@ -20,6 +21,7 @@ const NAV = [
   { to: "/admin/customers", label: "Khách hàng", Icon: Users },
   { to: "/admin/pricing", label: "Bảng giá", Icon: DollarSign },
   { to: "/admin/promotions", label: "Ưu đãi", Icon: Tag },
+  { to: "/admin/venues", label: "Địa điểm đối tác", Icon: MapPin },
   { to: "/admin/support", label: "Hỗ trợ", Icon: Headphones },
   { to: "/admin/reports", label: "Báo cáo", Icon: LayoutGrid },
 ] as const;

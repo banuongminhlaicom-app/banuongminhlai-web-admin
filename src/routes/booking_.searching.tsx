@@ -116,7 +116,7 @@ function Searching() {
           <div className="text-center">
             <div className="text-lg font-black">Đang tìm tài xế gần bạn…</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Chúng tôi đang kết nối với các tài xế trong bán kính 3km
+              Chúng tôi đang kết nối với các tài xế trong bán kính 5km
             </p>
           </div>
         )}

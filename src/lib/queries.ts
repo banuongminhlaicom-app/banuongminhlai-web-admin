@@ -192,6 +192,77 @@ export async function getActiveCustomerTrip(customerId: string): Promise<TripRow
   return data;
 }
 
+// Chuyến gần nhất ĐÃ HOÀN THÀNH của khách — dùng cho khối "Cuốc xe gần nhất"
+// trên Home để đặt lại nhanh cùng tuyến (khác với getActiveCustomerTrip ở
+// trên, vốn chỉ trả chuyến đang diễn ra).
+export async function getMostRecentCompletedTrip(customerId: string): Promise<TripRow | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("trips")
+    .select(
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+    )
+    .eq("customer_id", customerId)
+    .eq("status", "completed")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+// Toàn bộ lịch sử chuyến của khách (mọi trạng thái) — dùng cho trips.tsx, lọc
+// theo tab ở phía client. Khác getActiveCustomerTrip/getMostRecentCompletedTrip
+// ở trên vốn chỉ trả về 1 chuyến.
+export async function getTrips(customerId: string): Promise<TripRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("trips")
+    .select(
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+    )
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Toàn bộ chuyến trong hệ thống (mọi khách) — dùng cho admin.bookings.tsx.
+// Giới hạn 200 chuyến mới nhất để tránh tải cả bảng khi dữ liệu lớn dần; lấy
+// tên khách/tài xế qua bảng profiles riêng (không dùng embed join) giống hệt
+// cách getAdminDashboardStats().recentTrips đã làm.
+export async function getAllTripsAdmin(): Promise<
+  (TripRow & { customer_name: string | null; driver_name: string | null })[]
+> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("trips")
+    .select(
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  const trips = data ?? [];
+
+  const ids = Array.from(
+    new Set(trips.flatMap((t) => [t.customer_id, t.driver_id]).filter((id): id is string => !!id)),
+  );
+  const namesById = new Map<string, string | null>();
+  if (ids.length) {
+    const { data: nameRows } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", ids);
+    for (const row of nameRows ?? []) namesById.set(row.id, row.full_name);
+  }
+  return trips.map((t) => ({
+    ...t,
+    customer_name: namesById.get(t.customer_id) ?? null,
+    driver_name: t.driver_id ? (namesById.get(t.driver_id) ?? null) : null,
+  }));
+}
+
 export function subscribeTripStatus(id: string, onUpdate: (trip: TripRow) => void): () => void {
   if (!supabase) return () => {};
   const client = supabase;
@@ -314,6 +385,58 @@ export async function approveDriver(driverId: string, approved: boolean) {
   if (error) throw error;
 }
 
+// Hồ sơ đầy đủ hơn DriverRow (list) — dùng cho màn admin.drivers.$id.tsx.
+export interface DriverAdminDetail extends DriverRow {
+  status: string;
+  auto_accept: boolean;
+  today_trips: number;
+  today_revenue: number;
+}
+
+export async function getDriverAdminDetail(driverId: string): Promise<DriverAdminDetail | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, full_name, phone, drivers!inner(rating, trips_count, years_experience, vehicle_class, online, approved, status, auto_accept, today_trips, today_revenue)",
+    )
+    .eq("id", driverId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const d = Array.isArray(data.drivers) ? data.drivers[0] : data.drivers;
+  return {
+    id: data.id,
+    full_name: data.full_name,
+    phone: data.phone,
+    rating: d?.rating ?? 0,
+    trips_count: d?.trips_count ?? 0,
+    years_experience: d?.years_experience ?? 0,
+    vehicle_class: d?.vehicle_class ?? null,
+    online: d?.online ?? false,
+    approved: d?.approved ?? false,
+    status: d?.status ?? "offline",
+    auto_accept: d?.auto_accept ?? false,
+    today_trips: d?.today_trips ?? 0,
+    today_revenue: d?.today_revenue ?? 0,
+  };
+}
+
+// Lịch sử chuyến của 1 tài xế — dùng ở admin.drivers.$id.tsx.
+export async function getTripsByDriver(driverId: string, limit = 20): Promise<TripRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("trips")
+    .select(
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+    )
+    .eq("driver_id", driverId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ---------------------------------------------------------------------------
 // Customers (admin.customers.tsx)
 // ---------------------------------------------------------------------------
@@ -338,21 +461,28 @@ export async function getCustomers(): Promise<CustomerRow[]> {
 // ---------------------------------------------------------------------------
 // Promotions (admin.promotions.tsx, promotions.tsx, booking.tsx)
 // ---------------------------------------------------------------------------
+export type DiscountType = "fixed" | "percent";
+
 export interface PromotionRow {
   id: string;
   code: string;
   title: string;
   description: string | null;
   discount: number;
+  discount_type: DiscountType;
   expires_at: string | null;
   active: boolean;
+  image_url: string | null;
 }
+
+const PROMOTION_COLUMNS =
+  "id, code, title, description, discount, discount_type, expires_at, active, image_url";
 
 export async function getPromotions(): Promise<PromotionRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("promotions")
-    .select("id, code, title, description, discount, expires_at, active")
+    .select(PROMOTION_COLUMNS)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
@@ -362,7 +492,7 @@ export async function findActivePromotionByCode(code: string): Promise<Promotion
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("promotions")
-    .select("id, code, title, description, discount, expires_at, active")
+    .select(PROMOTION_COLUMNS)
     .eq("code", code.trim().toUpperCase())
     .eq("active", true)
     .maybeSingle();
@@ -370,6 +500,237 @@ export async function findActivePromotionByCode(code: string): Promise<Promotion
   if (!data) return null;
   if (data.expires_at && new Date(data.expires_at) < new Date()) return null;
   return data;
+}
+
+// Upload ảnh banner cho 1 mã khuyến mãi (admin.promotions.tsx) — lưu ở bucket
+// public "promotion-banners" rồi ghi URL công khai vào cột image_url. Xoá ảnh
+// cũ (nếu có) trước khi ghi đè, tránh rác tích luỹ trong bucket qua nhiều lần đổi ảnh.
+export async function uploadPromotionBanner(promotionId: string, file: File): Promise<string> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${promotionId}/${Date.now()}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from("promotion-banners")
+    .upload(path, file, { upsert: true });
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("promotion-banners").getPublicUrl(path);
+
+  const { error: updateError } = await supabase
+    .from("promotions")
+    .update({ image_url: publicUrl })
+    .eq("id", promotionId);
+  if (updateError) throw updateError;
+
+  return publicUrl;
+}
+
+export async function removePromotionBanner(promotionId: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("promotions")
+    .update({ image_url: null })
+    .eq("id", promotionId);
+  if (error) throw error;
+}
+
+export interface PromotionInput {
+  code: string;
+  title: string;
+  description: string | null;
+  discount: number;
+  discountType: DiscountType;
+  expiresAt: string | null; // yyyy-mm-dd, rỗng = không giới hạn
+}
+
+export async function createPromotion(input: PromotionInput): Promise<PromotionRow> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { data, error } = await supabase
+    .from("promotions")
+    .insert({
+      code: input.code.trim().toUpperCase(),
+      title: input.title.trim(),
+      description: input.description?.trim() || null,
+      discount: input.discount,
+      discount_type: input.discountType,
+      expires_at: input.expiresAt || null,
+    })
+    .select(PROMOTION_COLUMNS)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePromotion(id: string, input: PromotionInput): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("promotions")
+    .update({
+      code: input.code.trim().toUpperCase(),
+      title: input.title.trim(),
+      description: input.description?.trim() || null,
+      discount: input.discount,
+      discount_type: input.discountType,
+      expires_at: input.expiresAt || null,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+// Xoá hẳn mã khuyến mãi. Lượt đã dùng mã này (promotion_redemptions) tự dọn
+// theo vì FK khai báo "on delete cascade" — không cần dọn tay ở đây.
+export async function deletePromotion(id: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.from("promotions").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Partner venues (home.tsx, admin.venues.tsx) — quán nhậu/nhà hàng đối tác trả
+// phí quảng cáo, KHÔNG phải quét tự động theo GPS (đã bỏ vì Goong thiếu
+// ảnh/rating/giờ mở cửa thật).
+// ---------------------------------------------------------------------------
+export interface PartnerVenueRow {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  image_url: string | null;
+  active: boolean;
+  sort_order: number;
+}
+
+const PARTNER_VENUE_COLUMNS = "id, name, address, lat, lng, image_url, active, sort_order";
+
+// sort_order càng cao thì hiện càng trước — admin tự sắp xếp qua nút lên/xuống
+// trong admin.venues.tsx, thay vì luôn cố định theo ngày tạo.
+const PARTNER_VENUE_ORDER = [
+  { column: "sort_order", options: { ascending: false } },
+  { column: "created_at", options: { ascending: false } },
+] as const;
+
+// Home chỉ hiện venue đang active — dùng bởi khách.
+export async function getPartnerVenues(): Promise<PartnerVenueRow[]> {
+  if (!supabase) return [];
+  let query = supabase.from("partner_venues").select(PARTNER_VENUE_COLUMNS).eq("active", true);
+  for (const { column, options } of PARTNER_VENUE_ORDER) query = query.order(column, options);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Admin thấy cả venue đang tắt để còn bật lại được.
+export async function getPartnerVenuesAdmin(): Promise<PartnerVenueRow[]> {
+  if (!supabase) return [];
+  let query = supabase.from("partner_venues").select(PARTNER_VENUE_COLUMNS);
+  for (const { column, options } of PARTNER_VENUE_ORDER) query = query.order(column, options);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Đổi chỗ thứ tự 2 địa điểm cạnh nhau (nút lên/xuống trong admin) — hoán đổi
+// sort_order của 2 dòng thay vì đánh số lại toàn bộ danh sách.
+export async function swapPartnerVenueOrder(
+  aId: string,
+  aOrder: number,
+  bId: string,
+  bOrder: number,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error: e1 } = await supabase
+    .from("partner_venues")
+    .update({ sort_order: bOrder })
+    .eq("id", aId);
+  if (e1) throw e1;
+  const { error: e2 } = await supabase
+    .from("partner_venues")
+    .update({ sort_order: aOrder })
+    .eq("id", bId);
+  if (e2) throw e2;
+}
+
+export interface PartnerVenueInput {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}
+
+export async function createPartnerVenue(input: PartnerVenueInput): Promise<PartnerVenueRow> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { data, error } = await supabase
+    .from("partner_venues")
+    .insert({
+      name: input.name.trim(),
+      address: input.address.trim(),
+      lat: input.lat,
+      lng: input.lng,
+    })
+    .select(PARTNER_VENUE_COLUMNS)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePartnerVenue(id: string, input: PartnerVenueInput): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("partner_venues")
+    .update({
+      name: input.name.trim(),
+      address: input.address.trim(),
+      lat: input.lat,
+      lng: input.lng,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function togglePartnerVenueActive(id: string, active: boolean): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.from("partner_venues").update({ active }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function deletePartnerVenue(id: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.from("partner_venues").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function uploadPartnerVenueImage(venueId: string, file: File): Promise<string> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${venueId}/${Date.now()}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from("partner-venues")
+    .upload(path, file, { upsert: true });
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("partner-venues").getPublicUrl(path);
+
+  const { error: updateError } = await supabase
+    .from("partner_venues")
+    .update({ image_url: publicUrl })
+    .eq("id", venueId);
+  if (updateError) throw updateError;
+
+  return publicUrl;
+}
+
+export async function removePartnerVenueImage(venueId: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("partner_venues")
+    .update({ image_url: null })
+    .eq("id", venueId);
+  if (error) throw error;
 }
 
 // ---------------------------------------------------------------------------
@@ -1190,4 +1551,67 @@ export function subscribeNotifications(
   return () => {
     client.removeChannel(channel);
   };
+}
+
+// ---------------------------------------------------------------------------
+// Support tickets (support.tsx, admin.support.tsx)
+// ---------------------------------------------------------------------------
+export type SupportTicketStatus = "new" | "in_progress" | "resolved";
+
+export interface SupportTicketRow {
+  id: string;
+  requester_id: string;
+  subject: string;
+  message: string;
+  status: SupportTicketStatus;
+  created_at: string;
+}
+
+// Khách/tài xế gửi yêu cầu hỗ trợ từ support.tsx.
+export async function createSupportTicket(
+  requesterId: string,
+  subject: string,
+  message: string,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.from("support_tickets").insert({
+    requester_id: requesterId,
+    subject: subject.trim(),
+    message: message.trim(),
+  });
+  if (error) throw error;
+}
+
+// Admin xem toàn bộ ticket — lấy tên người gửi qua bảng profiles riêng, cùng
+// cách getAdminDashboardStats()/getAllTripsAdmin() đã làm ở trên.
+export async function getSupportTickets(): Promise<
+  (SupportTicketRow & { requester_name: string | null })[]
+> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("support_tickets")
+    .select("id, requester_id, subject, message, status, created_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const tickets = data ?? [];
+
+  const ids = Array.from(new Set(tickets.map((t) => t.requester_id)));
+  const namesById = new Map<string, string | null>();
+  if (ids.length) {
+    const { data: nameRows } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", ids);
+    for (const row of nameRows ?? []) namesById.set(row.id, row.full_name);
+  }
+  return tickets.map((t) => ({ ...t, requester_name: namesById.get(t.requester_id) ?? null }));
+}
+
+export async function updateSupportTicketStatus(
+  id: string,
+  status: SupportTicketStatus,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.from("support_tickets").update({ status }).eq("id", id);
+  if (error) throw error;
 }

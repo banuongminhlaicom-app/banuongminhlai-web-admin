@@ -35,9 +35,10 @@ import {
   getVehicleTypes,
   findActivePromotionByCode,
   pricingRuleRowToRule,
+  type DiscountType,
 } from "@/lib/queries";
 import { DEFAULT_PRICING } from "@/lib/pricing";
-import { formatKm, formatMinutes, formatVND } from "@/lib/format";
+import { formatDiscount, formatKm, formatMinutes, formatVND } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -46,8 +47,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 
+// Cho phép điền sẵn điểm đón/đến qua URL — dùng khi bấm thẻ "Địa điểm nhậu gần
+// bạn" (chỉ điền dropoff) hoặc "Đặt lại cùng tuyến" từ chuyến gần nhất (điền
+// cả pickup + dropoff) ở Home. Khai kiểu tường minh với `?:` optional — nếu để
+// TanStack tự suy luận từ object literal thì mọi nơi gọi <Link to="/booking">
+// khác sẽ bị bắt buộc phải truyền đủ các field này dù không cần.
+interface BookingSearch {
+  pickupAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffAddress?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
+}
+
 export const Route = createFileRoute("/booking")({
   head: () => ({ meta: [{ title: "Đặt tài xế" }] }),
+  validateSearch: (s: Record<string, unknown>): BookingSearch => ({
+    pickupAddress: typeof s.pickupAddress === "string" ? s.pickupAddress : undefined,
+    pickupLat: s.pickupLat != null ? Number(s.pickupLat) : undefined,
+    pickupLng: s.pickupLng != null ? Number(s.pickupLng) : undefined,
+    dropoffAddress: typeof s.dropoffAddress === "string" ? s.dropoffAddress : undefined,
+    dropoffLat: s.dropoffLat != null ? Number(s.dropoffLat) : undefined,
+    dropoffLng: s.dropoffLng != null ? Number(s.dropoffLng) : undefined,
+  }),
   component: Booking,
 });
 
@@ -82,6 +105,7 @@ function roundTo1000(v: number) {
 function Booking() {
   useRequireRole("customer");
   const navigate = useNavigate();
+  const search = Route.useSearch();
   const authState = useAuthState();
   const userId = authState.session?.user.id;
 
@@ -96,11 +120,17 @@ function Booking() {
   });
   const { data: pricingRow } = useQuery({ queryKey: ["pricing-rule"], queryFn: getPricingRule });
 
-  const [pickup, setPickup] = useState("Quán Bia Sài Gòn, Nguyễn Huệ, Cao Lãnh");
-  const [destination, setDestination] = useState("Phường Mỹ Phú, Cao Lãnh");
-  const [pickupCoord, setPickupCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [pickup, setPickup] = useState(search.pickupAddress ?? "");
+  const [destination, setDestination] = useState(search.dropoffAddress ?? "");
+  const [pickupCoord, setPickupCoord] = useState<{ lat: number; lng: number } | null>(
+    search.pickupLat != null && search.pickupLng != null
+      ? { lat: search.pickupLat, lng: search.pickupLng }
+      : null,
+  );
   const [destinationCoord, setDestinationCoord] = useState<{ lat: number; lng: number } | null>(
-    null,
+    search.dropoffLat != null && search.dropoffLng != null
+      ? { lat: search.dropoffLat, lng: search.dropoffLng }
+      : null,
   );
   const [routeInfo, setRouteInfo] = useState<{
     distanceKm: number;
@@ -127,6 +157,7 @@ function Booking() {
     id: string;
     code: string;
     discount: number;
+    discountType: DiscountType;
   } | null>(null);
   const [promoError, setPromoError] = useState("");
   const [promoChecking, setPromoChecking] = useState(false);
@@ -135,7 +166,7 @@ function Booking() {
   const [locating, setLocating] = useState(false);
 
   // Lấy vị trí GPS của thiết bị rồi đổi thành địa chỉ để điền vào ô điểm đón.
-  async function useCurrentLocation() {
+  async function locateCustomer() {
     setLocating(true);
     try {
       const coord = await getCurrentPosition();
@@ -151,14 +182,31 @@ function Booking() {
     }
   }
 
+  // Tự động lấy vị trí GPS ngay khi vào màn — khỏi bắt khách tự bấm nút định vị.
+  // Ref chặn gọi 2 lần do React Strict Mode double-invoke effect lúc dev.
+  const autoLocatedRef = useRef(false);
+  useEffect(() => {
+    if (autoLocatedRef.current) return;
+    autoLocatedRef.current = true;
+    // Đã có điểm đón từ URL (vd. "đặt lại cùng tuyến") — giữ nguyên, không để
+    // GPS tự ghi đè mất địa chỉ vừa điền sẵn.
+    if (search.pickupAddress) return;
+    locateCustomer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Gợi ý địa điểm kiểu Grab — tự vẽ dropdown để khớp giao diện sẵn có.
   // fetchPlaceSuggestions gọi Goong Places. Nếu chưa cấu hình Goong thì ô địa
   // chỉ vẫn là input thường (gõ tay vẫn đặt xe được như trước).
-  function debouncedFetch(input: string, setSuggestions: (s: PlaceSuggestion[]) => void) {
+  function debouncedFetch(
+    input: string,
+    setSuggestions: (s: PlaceSuggestion[]) => void,
+    bias?: { lat: number; lng: number },
+  ) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        setSuggestions(await fetchPlaceSuggestions(input));
+        setSuggestions(await fetchPlaceSuggestions(input, bias));
       } catch {
         setSuggestions([]);
       }
@@ -207,8 +255,18 @@ function Booking() {
     const firstBlock = rule.firstDistancePrice * multiplier;
     const extraKm = Math.max(0, distanceKm - rule.firstDistanceLimit);
     const extraFee = extraKm * rule.pricePerExtraKm * multiplier;
-    const discount = appliedPromo?.discount ?? 0;
-    const raw = openingFee + firstBlock + extraFee - discount;
+    const subtotal = openingFee + firstBlock + extraFee;
+    // Mã "percent" trừ theo % tổng tiền trước khuyến mãi; mã "fixed" trừ thẳng
+    // số tiền VNĐ như trước — không bao giờ để giảm nhiều hơn tổng tiền gốc.
+    const discount = appliedPromo
+      ? Math.min(
+          subtotal,
+          appliedPromo.discountType === "percent"
+            ? Math.round((subtotal * appliedPromo.discount) / 100)
+            : appliedPromo.discount,
+        )
+      : 0;
+    const raw = subtotal - discount;
     const total = roundTo1000(Math.max(raw, 0));
     return { multiplier, openingFee, firstBlock, extraKm, extraFee, discount, total };
   }, [vehicle, appliedPromo, rule, distanceKm, vehicleTypes]);
@@ -232,9 +290,16 @@ function Booking() {
     try {
       const found = await findActivePromotionByCode(code);
       if (found) {
-        setAppliedPromo({ id: found.id, code: found.code, discount: found.discount });
+        setAppliedPromo({
+          id: found.id,
+          code: found.code,
+          discount: found.discount,
+          discountType: found.discount_type,
+        });
         setPromoError("");
-        toast.success(`Đã áp dụng mã ${found.code} (-${formatVND(found.discount)})`);
+        toast.success(
+          `Đã áp dụng mã ${found.code} (-${formatDiscount(found.discount, found.discount_type)})`,
+        );
       } else {
         setAppliedPromo(null);
         setPromoError("Mã ưu đãi không hợp lệ hoặc đã hết hạn");
@@ -327,7 +392,7 @@ function Booking() {
                 />
                 <button
                   type="button"
-                  onClick={useCurrentLocation}
+                  onClick={locateCustomer}
                   disabled={locating}
                   title="Dùng vị trí hiện tại"
                   className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-primary transition hover:bg-primary/10 disabled:opacity-50"
@@ -349,9 +414,15 @@ function Booking() {
                   onChange={(e) => {
                     setDestination(e.target.value);
                     setDestinationCoord(null);
-                    debouncedFetch(e.target.value, setDestinationSuggestions);
+                    // Ưu tiên gợi ý quanh vị trí khách (pickup) nếu đã có, thay vì
+                    // luôn mặc định quanh trung tâm Cao Lãnh.
+                    debouncedFetch(
+                      e.target.value,
+                      setDestinationSuggestions,
+                      pickupCoord ?? undefined,
+                    );
                   }}
-                  placeholder="Bạn muốn về đâu?"
+                  placeholder="Bạn sẽ về đâu?"
                   className="w-full rounded-xl bg-background px-3 py-2.5 text-sm font-medium outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-success/40"
                 />
                 <SuggestionDropdown
@@ -377,29 +448,32 @@ function Booking() {
           </div>
         </div>
 
-        {/* Route summary */}
-        <div className="mt-3 flex items-center justify-around rounded-2xl bg-surface/60 p-3 text-center text-xs">
-          <div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Navigation className="h-3 w-3" /> Khoảng cách
+        {/* Route summary — chỉ hiện khi đã nhập điểm đến, tránh hiện số ước
+            lượng mặc định (6.8km/18 phút) lúc ô điểm đến còn trống. */}
+        {destination.trim() && (
+          <div className="mt-3 flex items-center justify-around rounded-2xl bg-surface/60 p-3 text-center text-xs">
+            <div>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Navigation className="h-3 w-3" /> Khoảng cách
+              </div>
+              <div className="text-sm font-semibold">{formatKm(distanceKm)}</div>
             </div>
-            <div className="text-sm font-semibold">{formatKm(distanceKm)}</div>
-          </div>
-          <div className="h-8 w-px bg-border" />
-          <div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <Clock className="h-3 w-3" /> Thời gian
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-3 w-3" /> Thời gian
+              </div>
+              <div className="text-sm font-semibold">{formatMinutes(duration)}</div>
             </div>
-            <div className="text-sm font-semibold">{formatMinutes(duration)}</div>
-          </div>
-          <div className="h-8 w-px bg-border" />
-          <div>
-            <div className="flex items-center gap-1 text-muted-foreground">
-              <MapPin className="h-3 w-3" /> Tuyến
+            <div className="h-8 w-px bg-border" />
+            <div>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <MapPin className="h-3 w-3" /> Tuyến
+              </div>
+              <div className="text-sm font-semibold">Tối ưu</div>
             </div>
-            <div className="text-sm font-semibold">Tối ưu</div>
           </div>
-        </div>
+        )}
 
         {/* Vehicle types */}
         <h3 className="mb-2 mt-5 text-sm font-semibold">Chọn phương tiện của bạn</h3>
@@ -562,7 +636,8 @@ function Booking() {
         {promoError && <p className="mt-1 pl-1 text-[12px] text-primary">{promoError}</p>}
         {appliedPromo && (
           <p className="mt-1 pl-1 text-[12px] text-success">
-            ✓ Đã áp dụng {appliedPromo.code} (-{formatVND(appliedPromo.discount)})
+            ✓ Đã áp dụng {appliedPromo.code} (-
+            {formatDiscount(appliedPromo.discount, appliedPromo.discountType)})
           </p>
         )}
 

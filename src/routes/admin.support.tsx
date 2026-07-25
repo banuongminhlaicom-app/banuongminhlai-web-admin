@@ -1,5 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
+import {
+  getSupportTickets,
+  updateSupportTicketStatus,
+  type SupportTicketStatus,
+} from "@/lib/queries";
+import { formatRelativeTime } from "@/lib/format";
+import { toast } from "sonner";
 import { useRequireRole } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/support")({
@@ -7,60 +16,82 @@ export const Route = createFileRoute("/admin/support")({
   component: AdminSupport,
 });
 
-const TICKETS = [
-  {
-    id: "T-201",
-    user: "Nguyễn Văn An",
-    subject: "Bỏ quên ví trên xe BUML-8815",
-    status: "Đang xử lý",
-    time: "10 phút trước",
-  },
-  {
-    id: "T-200",
-    user: "Trần Thị Bích",
-    subject: "Tài xế đến trễ hẹn 15 phút",
-    status: "Mới",
-    time: "35 phút trước",
-  },
-  {
-    id: "T-199",
-    user: "Lê Minh Khoa",
-    subject: "Yêu cầu hoàn tiền chuyến bị hủy",
-    status: "Đã xử lý",
-    time: "2 giờ trước",
-  },
-];
+const STATUS_LABEL: Record<SupportTicketStatus, string> = {
+  new: "Mới",
+  in_progress: "Đang xử lý",
+  resolved: "Đã xử lý",
+};
+
+const STATUS_TONE: Record<SupportTicketStatus, string> = {
+  new: "bg-primary/20 text-primary",
+  in_progress: "bg-warning/20 text-warning",
+  resolved: "bg-success/20 text-success",
+};
 
 function AdminSupport() {
   useRequireRole("admin");
+  const queryClient = useQueryClient();
+  const { data: tickets, isLoading } = useQuery({
+    queryKey: ["admin", "support-tickets"],
+    queryFn: getSupportTickets,
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: SupportTicketStatus }) =>
+      updateSupportTicketStatus(id, status),
+    onSuccess: () => {
+      toast.success("Đã cập nhật trạng thái");
+      queryClient.invalidateQueries({ queryKey: ["admin", "support-tickets"] });
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Không cập nhật được."),
+  });
+
   return (
     <AdminLayout title="Yêu cầu hỗ trợ">
-      <div className="space-y-2">
-        {TICKETS.map((t) => (
-          <div key={t.id} className="flex items-center gap-3 rounded-2xl bg-surface p-4">
-            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-background font-mono text-xs font-bold">
-              {t.id}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-bold">{t.subject}</div>
-              <div className="text-xs text-muted-foreground">
-                {t.user} · {t.time}
+      {isLoading ? (
+        <div className="grid h-40 place-items-center text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+      ) : !tickets || tickets.length === 0 ? (
+        <div className="rounded-3xl bg-surface p-10 text-center text-sm text-muted-foreground">
+          Chưa có yêu cầu hỗ trợ nào.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {tickets.map((t) => (
+            <div key={t.id} className="rounded-2xl bg-surface p-4">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold">{t.subject}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {t.requester_name ?? "Người dùng"} · {formatRelativeTime(t.created_at)}
+                  </div>
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">
+                    {t.message}
+                  </p>
+                </div>
+                <select
+                  value={t.status}
+                  onChange={(e) =>
+                    statusMutation.mutate({
+                      id: t.id,
+                      status: e.target.value as SupportTicketStatus,
+                    })
+                  }
+                  disabled={statusMutation.isPending}
+                  className={`shrink-0 rounded-full border-0 px-2 py-1 text-[10px] font-bold outline-none disabled:opacity-60 ${STATUS_TONE[t.status]}`}
+                >
+                  {(Object.keys(STATUS_LABEL) as SupportTicketStatus[]).map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                t.status === "Mới"
-                  ? "bg-primary/20 text-primary"
-                  : t.status === "Đang xử lý"
-                    ? "bg-warning/20 text-warning"
-                    : "bg-success/20 text-success"
-              }`}
-            >
-              {t.status}
-            </span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </AdminLayout>
   );
 }

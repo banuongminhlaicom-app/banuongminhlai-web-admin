@@ -41,19 +41,30 @@ interface GoongPrediction {
 
 // Gõ tìm địa chỉ — trả về danh sách gợi ý (Goong Place Autocomplete).
 // Gõ lùi/gõ lại cùng một chuỗi sẽ lấy từ cache, không tốn thêm lượt gọi.
-export async function fetchPlaceSuggestions(input: string): Promise<PlaceSuggestion[]> {
+// `bias`: toạ độ để ưu tiên gợi ý xung quanh (vd. vị trí GPS khách vừa lấy) —
+// mặc định CENTER (Cao Lãnh) nếu chưa có toạ độ thật nào.
+export async function fetchPlaceSuggestions(
+  input: string,
+  bias?: { lat: number; lng: number },
+): Promise<PlaceSuggestion[]> {
   const query = input.trim();
-  if (!isMapConfigured || query.length < 3) return [];
+  // Chờ gõ đủ 3 từ trở lên mới gọi API (số nhà cũng tính là 1 từ, vd. "123
+  // Nguyễn Huệ" = 3 từ) — gõ 1-2 từ đầu thường chưa đủ để gợi ý hữu ích (vd.
+  // "Điện" khớp hàng trăm địa danh khắp cả nước) mà vẫn tốn lượt gọi.
+  const wordCount = query.split(/\s+/).filter(Boolean).length;
+  if (!isMapConfigured || query.length < 3 || wordCount < 3) return [];
 
-  // Chuẩn hoá key để "Chợ Cao Lãnh" và "chợ  cao lãnh" dùng chung một cache.
-  const cacheKey = `ac:${query.toLowerCase().replace(/\s+/g, " ")}`;
+  const center = bias ?? CENTER;
+  // Chuẩn hoá key để "Chợ Cao Lãnh" và "chợ  cao lãnh" dùng chung một cache;
+  // gộp cả toạ độ bias vì cùng 1 chuỗi gõ nhưng khác khu vực sẽ ra gợi ý khác.
+  const cacheKey = `ac:${center.lat.toFixed(2)},${center.lng.toFixed(2)}:${query.toLowerCase().replace(/\s+/g, " ")}`;
 
   const predictions = await cachedFetch<GoongPrediction[]>(cacheKey, TTL_AUTOCOMPLETE, async () => {
     if (!allowAutocomplete()) throw new Error("Gọi Goong quá nhanh, bỏ qua lượt này.");
     const url =
       `${GOONG_BASE}/Place/AutoComplete?api_key=${GOONG_KEY}` +
       `&input=${encodeURIComponent(query)}` +
-      `&location=${CENTER.lat},${CENTER.lng}&radius=50&more_compound=true`;
+      `&location=${center.lat},${center.lng}&radius=50&more_compound=true`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Goong AutoComplete lỗi ${res.status}`);
     const data = (await res.json()) as { predictions?: GoongPrediction[] };

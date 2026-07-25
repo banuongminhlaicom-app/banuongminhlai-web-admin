@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tag, Copy, Loader2 } from "lucide-react";
 import { MobileShell } from "@/components/MobileShell";
 import { getPromotions, findActivePromotionByCode } from "@/lib/queries";
-import { formatVND } from "@/lib/format";
+import { formatDiscount } from "@/lib/format";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useRequireRole } from "@/lib/auth";
@@ -29,7 +29,9 @@ function PromotionsScreen() {
     try {
       const promo = await findActivePromotionByCode(code);
       if (promo) {
-        toast.success(`Đã áp dụng mã ${promo.code} (-${formatVND(promo.discount)})`);
+        toast.success(
+          `Đã áp dụng mã ${promo.code} (-${formatDiscount(promo.discount, promo.discount_type)})`,
+        );
       } else {
         toast.error("Mã ưu đãi không hợp lệ hoặc đã hết hạn");
       }
@@ -114,7 +116,7 @@ function PromotionsScreen() {
                       <Copy className="h-3.5 w-3.5" />
                     </button>
                     <div className="ml-auto text-sm font-bold text-primary">
-                      -{formatVND(p.discount)}
+                      -{formatDiscount(p.discount, p.discount_type)}
                     </div>
                   </div>
                 </div>

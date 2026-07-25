@@ -31,6 +31,10 @@ export function formatRelativeTime(iso: string): string {
   });
 }
 
+export function formatDiscount(discount: number, type: "fixed" | "percent"): string {
+  return type === "percent" ? `${discount}%` : formatVND(discount);
+}
+
 export function greetingByHour(d = new Date()): string {
   const h = d.getHours();
   if (h < 11) return "Chào buổi sáng";
