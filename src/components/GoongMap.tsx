@@ -17,26 +17,17 @@ export interface Coord {
   lng: number;
 }
 
-// Tạo phần tử DOM cho marker tài xế: vòng tròn xanh dương + mũi tên trắng chỉ
-// hướng đi. Trả về cả `inner` để component xoay theo bearing bằng CSS transform
-// (mapbox/goong quản lý transform của `wrap` để đặt vị trí, nên phải xoay lớp
-// con để không bị ghi đè).
-function makeDriverArrowEl() {
+// Tạo phần tử DOM cho marker tài xế: icon ghim bản đồ hình tài xế (ảnh tĩnh,
+// không xoay theo hướng đi nữa — icon dạng ghim chỉ đẹp khi luôn thẳng đứng,
+// đặt anchor "bottom" ở nơi gọi để đúng mũi ghim trỏ vào toạ độ thật).
+function makeDriverMarkerEl() {
   const wrap = document.createElement("div");
-  wrap.style.width = "42px";
-  wrap.style.height = "42px";
+  wrap.style.width = "40px";
+  wrap.style.height = "44px";
   wrap.style.pointerEvents = "none";
-  const inner = document.createElement("div");
-  inner.style.width = "100%";
-  inner.style.height = "100%";
-  inner.style.transition = "transform 300ms ease-out";
-  inner.innerHTML =
-    '<svg viewBox="0 0 42 42" width="42" height="42" xmlns="http://www.w3.org/2000/svg">' +
-    '<circle cx="21" cy="21" r="15" fill="#2563eb" stroke="#ffffff" stroke-width="3"/>' +
-    '<path d="M21 12 L29 27 L21 22.5 L13 27 Z" fill="#ffffff"/>' +
-    "</svg>";
-  wrap.appendChild(inner);
-  return { wrap, inner };
+  wrap.innerHTML =
+    '<img src="/icons/driver-icon.png" alt="Tài xế" style="width:100%;height:100%;object-fit:contain" />';
+  return { wrap };
 }
 
 // Hướng "phía trước" theo tuyến đường: đi dọc polyline (bắt đầu ~ vị trí tài
@@ -94,9 +85,6 @@ export function GoongMap({
   // Đã có hướng thật từ GPS chuyển động chưa. Trước khi có, xoay bản đồ theo
   // hướng tuyến đường phía trước để không bị kẹt hướng Bắc lúc đứng yên.
   const hasHeadingRef = useRef(false);
-  // Phần tử bên trong marker tài xế — xoay riêng bằng CSS transform theo hướng
-  // đi (bearing), không phụ thuộc SDK có hỗ trợ setRotation hay không.
-  const driverArrowRef = useRef<HTMLDivElement | null>(null);
 
   // Chế độ dẫn đường: camera tự bám vị trí xe (mặc định) cho tới khi người
   // dùng tự kéo/vuốt bản đồ — lúc đó ngừng bám để họ xem tự do, nút định vị
@@ -298,22 +286,13 @@ export function GoongMap({
     if (!driver) {
       markersRef.current.driver?.remove();
       delete markersRef.current.driver;
-      driverArrowRef.current = null;
     } else if (!markersRef.current.driver) {
-      const { wrap, inner } = makeDriverArrowEl();
-      driverArrowRef.current = inner;
-      markersRef.current.driver = new goongjs.Marker({ element: wrap })
+      const { wrap } = makeDriverMarkerEl();
+      markersRef.current.driver = new goongjs.Marker({ element: wrap, anchor: "bottom" })
         .setLngLat([driver.lng, driver.lat])
         .addTo(map);
     } else {
       markersRef.current.driver.setLngLat([driver.lng, driver.lat]);
-    }
-    // Ở chế độ dẫn đường bản đồ đã xoay theo hướng đi (heading-up), nên mũi tên
-    // luôn hướng LÊN màn hình (rotate 0) — không xoay thêm kẻo bị lệch gấp đôi.
-    // Ở chế độ thường (khách theo dõi, bản đồ hướng Bắc) thì mũi tên xoay theo
-    // hướng xe để thể hiện chiều di chuyển.
-    if (driverArrowRef.current) {
-      driverArrowRef.current.style.transform = `rotate(${navigate ? 0 : bearingRef.current}deg)`;
     }
 
     if (routePolyline) drawRoute(map, routePolyline);

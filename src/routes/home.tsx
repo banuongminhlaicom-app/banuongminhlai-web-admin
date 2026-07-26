@@ -452,7 +452,7 @@ function HomeScreen() {
           <BrandLogo size="sm" showText={false} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[14px] font-black leading-tight">
-              Chở trọn <span className="text-primary">niềm vui</span>
+              Chở trọn <span className="text-primary">NIỀM TIN</span>
             </div>
           </div>
           <button

@@ -10,6 +10,7 @@ export interface Profile {
   role: UserRole;
   full_name: string | null;
   phone: string | null;
+  avatar_url: string | null;
 }
 
 type AuthStatus = "loading" | "signed_out" | "signed_in";
@@ -39,7 +40,7 @@ async function loadProfile(userId: string): Promise<Profile | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, role, full_name, phone")
+    .select("id, role, full_name, phone, avatar_url")
     .eq("id", userId)
     .maybeSingle();
   if (error) {
@@ -87,6 +88,14 @@ export const authStore = {
 
 export function useAuthState(): AuthState {
   return useSyncExternalStore(authStore.subscribe, authStore.get, () => DEFAULT_STATE);
+}
+
+// Tải lại profile của phiên hiện tại vào store — gọi sau khi sửa hồ sơ
+// (đổi tên/avatar) để UI cập nhật ngay, không cần load lại trang.
+export async function refreshProfile(): Promise<void> {
+  if (!state.session) return;
+  const profile = await loadProfile(state.session.user.id);
+  setState({ profile });
 }
 
 // Tạo hồ sơ nếu chưa có. Nếu đã có, KHÔNG đổi role — tránh trường hợp đăng

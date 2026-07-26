@@ -173,6 +173,17 @@ export async function rateTrip(id: string, rating: number, feedback: string): Pr
   if (error) throw error;
 }
 
+// Tài xế đánh giá khách sau khi hoàn thành chuyến — chiều ngược lại của
+// rateTrip(). profiles.rating của khách tự tính lại qua trigger DB (stage16).
+export async function rateCustomer(id: string, rating: number, feedback: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("trips")
+    .update({ driver_rating: rating, driver_feedback: feedback || null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 // Chuyến đang hoạt động của khách (chưa hoàn thành/huỷ) — để hiện lại trên
 // trang chủ, tránh mất dấu chuyến khi khách bấm về Home giữa chừng.
 // Dùng chung ACTIVE_TRIP_STATUSES định nghĩa bên dưới (admin dashboard).
@@ -456,6 +467,74 @@ export async function getCustomers(): Promise<CustomerRow[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Hồ sơ người dùng (profile.tsx, driver.profile.tsx) — sửa tên/avatar dùng
+// chung cho cả khách hàng và tài xế.
+// ---------------------------------------------------------------------------
+export async function updateMyProfile(
+  userId: string,
+  patch: { full_name?: string; avatar_url?: string },
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
+  if (error) throw error;
+}
+
+// Upload ảnh đại diện vào bucket public "avatars" (stage17), path bắt buộc
+// theo <user_id>/... để khớp RLS chủ sở hữu, rồi ghi thẳng vào profiles.avatar_url.
+export async function uploadAvatar(userId: string, file: File): Promise<string> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${userId}/${Date.now()}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from("avatars")
+    .upload(path, file, { upsert: true });
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("avatars").getPublicUrl(path);
+
+  await updateMyProfile(userId, { avatar_url: publicUrl });
+  return publicUrl;
+}
+
+export interface CustomerStatsRow {
+  tripsCount: number;
+  rating: number;
+  points: number;
+  promotionsUsed: number;
+}
+
+// Thống kê thật cho profile.tsx — trước đây "14 chuyến", "4.9", "230 điểm",
+// "3 ưu đãi" đều là số hardcode.
+export async function getCustomerStats(customerId: string): Promise<CustomerStatsRow> {
+  if (!supabase) return { tripsCount: 0, rating: 5, points: 0, promotionsUsed: 0 };
+  const client = supabase;
+  const [tripsRes, profileRes, pointsRow, promotionsRes] = await Promise.all([
+    client
+      .from("trips")
+      .select("id", { count: "exact", head: true })
+      .eq("customer_id", customerId)
+      .eq("status", "completed"),
+    client.from("profiles").select("rating").eq("id", customerId).maybeSingle(),
+    getLoyaltyPoints(customerId),
+    client
+      .from("promotion_redemptions")
+      .select("id", { count: "exact", head: true })
+      .eq("customer_id", customerId),
+  ]);
+  if (tripsRes.error) throw tripsRes.error;
+  if (profileRes.error) throw profileRes.error;
+  if (promotionsRes.error) throw promotionsRes.error;
+  return {
+    tripsCount: tripsRes.count ?? 0,
+    rating: profileRes.data?.rating ?? 5,
+    points: pointsRow?.balance ?? 0,
+    promotionsUsed: promotionsRes.count ?? 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -934,6 +1013,104 @@ export async function completeDriverTrip(
     })
     .eq("id", driverId);
   if (driverErr) throw driverErr;
+}
+
+// ---------------------------------------------------------------------------
+// Hồ sơ giấy tờ tài xế (driver.profile.tsx) — trước đây toàn dữ liệu giả
+// hardcode. id_photo_path/license_photo_path lưu path trong bucket private
+// "driver-docs" (stage18), không phải URL công khai — phải đổi thành signed
+// URL mỗi lần hiển thị vì ảnh giấy tờ tuỳ thân nhạy cảm.
+// ---------------------------------------------------------------------------
+export interface DriverKycRow {
+  years_experience: number;
+  vehicle_class: string | null;
+  id_number: string | null;
+  id_photo_url: string | null;
+  license_class: string | null;
+  license_expiry: string | null;
+  license_photo_url: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+}
+
+const DRIVER_KYC_COLUMNS =
+  "years_experience, vehicle_class, id_number, id_photo_path, license_class, license_expiry, license_photo_path, emergency_contact_name, emergency_contact_phone";
+
+async function signDriverDocPath(path: string | null): Promise<string | null> {
+  if (!supabase || !path) return null;
+  const { data } = await supabase.storage.from("driver-docs").createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
+
+export async function getDriverKyc(driverId: string): Promise<DriverKycRow | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("drivers")
+    .select(DRIVER_KYC_COLUMNS)
+    .eq("id", driverId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const [id_photo_url, license_photo_url] = await Promise.all([
+    signDriverDocPath(data.id_photo_path),
+    signDriverDocPath(data.license_photo_path),
+  ]);
+
+  return {
+    years_experience: data.years_experience,
+    vehicle_class: data.vehicle_class,
+    id_number: data.id_number,
+    id_photo_url,
+    license_class: data.license_class,
+    license_expiry: data.license_expiry,
+    license_photo_url,
+    emergency_contact_name: data.emergency_contact_name,
+    emergency_contact_phone: data.emergency_contact_phone,
+  };
+}
+
+export async function updateDriverKyc(
+  driverId: string,
+  patch: Partial<{
+    years_experience: number;
+    vehicle_class: string;
+    id_number: string;
+    license_class: string;
+    license_expiry: string;
+    emergency_contact_name: string;
+    emergency_contact_phone: string;
+  }>,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.from("drivers").update(patch).eq("id", driverId);
+  if (error) throw error;
+}
+
+// Upload ảnh CCCD/GPLX vào bucket private "driver-docs", ghi path (không phải
+// URL) vào drivers.id_photo_path/license_photo_path, trả về 1 signed URL để
+// hiển thị ngay không cần chờ query lại.
+export async function uploadDriverDoc(
+  driverId: string,
+  kind: "id" | "license",
+  file: File,
+): Promise<string | null> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${driverId}/${kind}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from("driver-docs")
+    .upload(path, file, { upsert: true });
+  if (uploadError) throw uploadError;
+
+  const column = kind === "id" ? "id_photo_path" : "license_photo_path";
+  const { error: updateError } = await supabase
+    .from("drivers")
+    .update({ [column]: path })
+    .eq("id", driverId);
+  if (updateError) throw updateError;
+
+  return signDriverDocPath(path);
 }
 
 // ---------------------------------------------------------------------------

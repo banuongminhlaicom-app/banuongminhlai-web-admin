@@ -13,6 +13,7 @@ import {
   Power,
   Redo2,
   Route as RouteIcon,
+  Star,
   Undo2,
   X,
 } from "lucide-react";
@@ -24,12 +25,14 @@ import { GoongMap } from "@/components/GoongMap";
 import { TripChat } from "@/components/TripChat";
 import { fetchRoute, haversineKm } from "@/lib/places";
 import { useAuthState, useRequireRole } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import {
   completeDriverTrip,
   getCustomerProfileForTrip,
   getDriverSelf,
   getTrip,
   markDriverArrived,
+  rateCustomer,
   setDriverStatus,
   subscribeDriverSelf,
   subscribeTripStatus,
@@ -38,7 +41,6 @@ import {
   type TripRow,
 } from "@/lib/queries";
 import { formatKm, formatMinutes, formatVND } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/driver/trips/$id")({
   head: () => ({ meta: [{ title: "Chuyến đi hiện tại" }] }),
@@ -88,6 +90,7 @@ function DriverTripDetail() {
   }, [driverId, queryClient]);
 
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [ratingOpen, setRatingOpen] = useState(false);
   const [issueOpen, setIssueOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   // Báo có tin nhắn mới từ khách (âm thanh + toast + badge) khi tài xế không
@@ -547,10 +550,21 @@ function DriverTripDetail() {
               await completeDriverTrip(driverId, trip.id, { todayTrips, todayRevenue });
               setSummaryOpen(false);
               toast.success("Đã hoàn thành chuyến đi!");
-              navigate({ to: "/driver" });
+              setRatingOpen(true);
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Không hoàn thành được chuyến.");
             }
+          }}
+        />
+      )}
+
+      {ratingOpen && (
+        <RateCustomerSheet
+          tripId={trip.id}
+          customerName={customer?.full_name ?? "Khách hàng"}
+          onDone={() => {
+            setRatingOpen(false);
+            navigate({ to: "/driver" });
           }}
         />
       )}
@@ -752,6 +766,82 @@ function SummarySheet({
         >
           Xác nhận hoàn thành
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Tài xế đánh giá khách ngay sau khi hoàn thành chuyến — chiều ngược lại của
+// RealCompletedSection ở booking_.$id.tsx (khách đánh giá tài xế). Có nút
+// "Bỏ qua" vì đánh giá khách không bắt buộc, không nên chặn tài xế về màn hình chính.
+function RateCustomerSheet({
+  tripId,
+  customerName,
+  onDone,
+}: {
+  tripId: string;
+  customerName: string;
+  onDone: () => void;
+}) {
+  const [rating, setRating] = useState(5);
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      await rateCustomer(tripId, rating, note);
+      toast.success("Cảm ơn bạn đã đánh giá!");
+      onDone();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không gửi được đánh giá.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/60 backdrop-blur-sm">
+      <div className="safe-bottom w-full max-w-md rounded-t-3xl bg-background p-5 pb-8">
+        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-muted" />
+        <div className="text-center">
+          <div className="text-base font-black">Đánh giá khách hàng</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{customerName}</div>
+        </div>
+
+        <div className="mt-4 flex justify-center gap-2">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button key={n} onClick={() => setRating(n)}>
+              <Star
+                className={cn("h-8 w-8", n <= rating ? "fill-warning text-warning" : "text-muted")}
+              />
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          rows={3}
+          placeholder="Nhận xét về khách (không bắt buộc)..."
+          className="mt-3 w-full resize-none rounded-2xl bg-surface p-3 text-base outline-none focus:ring-2 focus:ring-primary/40"
+        />
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            onClick={onDone}
+            className="rounded-2xl border border-border py-3 text-sm font-bold"
+          >
+            Bỏ qua
+          </button>
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="flex items-center justify-center gap-1.5 rounded-2xl gradient-primary py-3 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-60"
+          >
+            {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Gửi đánh giá
+          </button>
+        </div>
       </div>
     </div>
   );

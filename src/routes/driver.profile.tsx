@@ -1,16 +1,30 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, LogOut, Star } from "lucide-react";
+import { useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, CheckCircle2, ImagePlus, Loader2, LogOut, Pencil, Star, X } from "lucide-react";
 import { toast } from "sonner";
 import { DriverShell } from "@/components/DriverShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { signOutAuth, useAuthState, useRequireRole } from "@/lib/auth";
-import { getDriverSelf } from "@/lib/queries";
+import { refreshProfile, signOutAuth, useAuthState, useRequireRole } from "@/lib/auth";
+import {
+  getDriverKyc,
+  getDriverSelf,
+  updateDriverKyc,
+  updateMyProfile,
+  uploadAvatar,
+  uploadDriverDoc,
+  type DriverKycRow,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/driver/profile")({
   head: () => ({ meta: [{ title: "Hồ sơ tài xế" }] }),
   component: DriverProfile,
 });
+
+function formatExpiry(iso: string | null) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("vi-VN", { month: "2-digit", year: "numeric" });
+}
 
 function DriverProfile() {
   useRequireRole("driver");
@@ -22,6 +36,11 @@ function DriverProfile() {
     queryFn: () => getDriverSelf(driverId!),
     enabled: !!driverId,
   });
+  const { data: kyc } = useQuery({
+    queryKey: ["driver-kyc", driverId],
+    queryFn: () => getDriverKyc(driverId!),
+    enabled: !!driverId,
+  });
   const fullName = authState.profile?.full_name ?? "Tài xế";
   const initials = fullName
     .split(" ")
@@ -29,6 +48,7 @@ function DriverProfile() {
     .map((w) => w[0])
     .join("")
     .toUpperCase();
+  const [editing, setEditing] = useState(false);
 
   const logout = async () => {
     await signOutAuth();
@@ -36,14 +56,43 @@ function DriverProfile() {
     navigate({ to: "/driver/login" });
   };
 
+  const expiry = formatExpiry(kyc?.license_expiry ?? null);
   const docs = [
-    { label: "Ảnh chân dung", value: "Đã tải lên", verified: true },
-    { label: "Họ tên", value: fullName, verified: true },
-    { label: "Số điện thoại", value: authState.profile?.phone ?? "—", verified: true },
-    { label: "Căn cước công dân", value: "079****1234", verified: true },
-    { label: "Giấy phép lái xe", value: "Hạng B2 · HSD 03/2029", verified: true },
-    { label: "Kinh nghiệm lái xe", value: "8 năm", verified: true },
-    { label: "Người liên hệ khẩn cấp", value: "Trần Thị Hoa · 0987 654 321", verified: true },
+    {
+      label: "Ảnh chân dung",
+      value: authState.profile?.avatar_url ? "Đã tải lên" : "Chưa cập nhật",
+      verified: !!authState.profile?.avatar_url,
+    },
+    { label: "Họ tên", value: fullName, verified: !!authState.profile?.full_name },
+    {
+      label: "Số điện thoại",
+      value: authState.profile?.phone ?? "—",
+      verified: !!authState.profile?.phone,
+    },
+    {
+      label: "Căn cước công dân",
+      value: kyc?.id_number ?? "Chưa cập nhật",
+      verified: !!kyc?.id_number,
+    },
+    {
+      label: "Giấy phép lái xe",
+      value: kyc?.license_class
+        ? `Hạng ${kyc.license_class}${expiry ? ` · HSD ${expiry}` : ""}`
+        : "Chưa cập nhật",
+      verified: !!kyc?.license_class,
+    },
+    {
+      label: "Kinh nghiệm lái xe",
+      value: `${kyc?.years_experience ?? 0} năm`,
+      verified: (kyc?.years_experience ?? 0) > 0,
+    },
+    {
+      label: "Người liên hệ khẩn cấp",
+      value: kyc?.emergency_contact_name
+        ? `${kyc.emergency_contact_name}${kyc.emergency_contact_phone ? ` · ${kyc.emergency_contact_phone}` : ""}`
+        : "Chưa cập nhật",
+      verified: !!kyc?.emergency_contact_name,
+    },
   ];
 
   return (
@@ -56,8 +105,25 @@ function DriverProfile() {
       </div>
 
       <div className="mx-5 rounded-3xl bg-surface p-5 text-center shadow-elevated">
-        <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl gradient-primary text-2xl font-black text-primary-foreground shadow-glow">
-          {initials || "TX"}
+        <div className="relative mx-auto w-fit">
+          {authState.profile?.avatar_url ? (
+            <img
+              src={authState.profile.avatar_url}
+              alt={fullName}
+              className="mx-auto h-20 w-20 rounded-3xl object-cover shadow-glow"
+            />
+          ) : (
+            <div className="mx-auto grid h-20 w-20 place-items-center rounded-3xl gradient-primary text-2xl font-black text-primary-foreground shadow-glow">
+              {initials || "TX"}
+            </div>
+          )}
+          <button
+            onClick={() => setEditing(true)}
+            aria-label="Chỉnh sửa hồ sơ"
+            className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground shadow-elevated"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
         </div>
         <div className="mt-3 text-lg font-black">{fullName}</div>
         <div className="text-xs text-muted-foreground">Tài xế · Cao Lãnh, Đồng Tháp</div>
@@ -92,11 +158,323 @@ function DriverProfile() {
       </div>
 
       <button
+        onClick={() => setEditing(true)}
+        className="mx-5 mt-4 flex w-[calc(100%-2.5rem)] items-center justify-center gap-2 rounded-2xl border border-border py-3.5 text-sm font-bold"
+      >
+        <Pencil className="h-4 w-4" /> Cập nhật hồ sơ & giấy tờ
+      </button>
+
+      <button
         onClick={logout}
-        className="mx-5 mt-4 flex w-[calc(100%-2.5rem)] items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 py-3.5 text-sm font-bold text-destructive"
+        className="mx-5 mt-3 flex w-[calc(100%-2.5rem)] items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 py-3.5 text-sm font-bold text-destructive"
       >
         <LogOut className="h-4 w-4" /> Đăng xuất
       </button>
+
+      {editing && driverId && (
+        <EditDriverProfileModal
+          driverId={driverId}
+          fullName={fullName}
+          avatarUrl={authState.profile?.avatar_url ?? null}
+          kyc={kyc ?? null}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </DriverShell>
+  );
+}
+
+function EditDriverProfileModal({
+  driverId,
+  fullName,
+  avatarUrl,
+  kyc,
+  onClose,
+}: {
+  driverId: string;
+  fullName: string;
+  avatarUrl: string | null;
+  kyc: DriverKycRow | null;
+  onClose: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState(avatarUrl);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const [name, setName] = useState(fullName);
+  const [idNumber, setIdNumber] = useState(kyc?.id_number ?? "");
+  const [licenseClass, setLicenseClass] = useState(kyc?.license_class ?? "");
+  const [licenseExpiry, setLicenseExpiry] = useState(kyc?.license_expiry ?? "");
+  const [yearsExperience, setYearsExperience] = useState(String(kyc?.years_experience ?? 0));
+  const [emergencyName, setEmergencyName] = useState(kyc?.emergency_contact_name ?? "");
+  const [emergencyPhone, setEmergencyPhone] = useState(kyc?.emergency_contact_phone ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["driver-kyc", driverId] });
+  };
+
+  const pickAvatar = async (file: File) => {
+    setAvatarUploading(true);
+    try {
+      const url = await uploadAvatar(driverId, file);
+      setAvatarPreview(url);
+      await refreshProfile();
+      toast.success("Đã cập nhật ảnh chân dung");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không tải được ảnh.");
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const save = async () => {
+    if (!name.trim()) {
+      toast.error("Vui lòng nhập họ tên.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateMyProfile(driverId, { full_name: name.trim() });
+      await updateDriverKyc(driverId, {
+        id_number: idNumber.trim() || undefined,
+        license_class: licenseClass.trim() || undefined,
+        license_expiry: licenseExpiry || undefined,
+        years_experience: Number(yearsExperience) || 0,
+        emergency_contact_name: emergencyName.trim() || undefined,
+        emergency_contact_phone: emergencyPhone.trim() || undefined,
+      });
+      await refreshProfile();
+      invalidateAll();
+      toast.success("Đã lưu hồ sơ");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không lưu được hồ sơ.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="safe-bottom max-h-[88vh] w-full overflow-y-auto rounded-t-3xl bg-background p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-base font-black">Cập nhật hồ sơ & giấy tờ</div>
+          <button
+            onClick={onClose}
+            aria-label="Đóng"
+            className="grid h-8 w-8 place-items-center rounded-full bg-surface"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex justify-center">
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) pickAvatar(file);
+            }}
+          />
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading}
+            className="relative"
+            aria-label="Đổi ảnh chân dung"
+          >
+            {avatarPreview ? (
+              <img
+                src={avatarPreview}
+                alt="Ảnh chân dung"
+                className="h-20 w-20 rounded-2xl object-cover shadow-glow"
+              />
+            ) : (
+              <div className="grid h-20 w-20 place-items-center rounded-2xl gradient-primary text-xl font-black text-primary-foreground shadow-glow">
+                {(name || "TX").slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground shadow-elevated">
+              {avatarUploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Pencil className="h-3.5 w-3.5" />
+              )}
+            </span>
+          </button>
+        </div>
+
+        <Field label="Họ tên" value={name} onChange={setName} placeholder="Nhập họ tên" />
+
+        <div className="mt-4 text-xs font-bold uppercase text-muted-foreground">
+          Căn cước công dân
+        </div>
+        <Field label="Số CCCD" value={idNumber} onChange={setIdNumber} placeholder="079xxxxxxxxx" />
+        <DocUploadRow
+          label="Ảnh CCCD"
+          driverId={driverId}
+          kind="id"
+          hasPhoto={!!kyc?.id_photo_url}
+          onUploaded={invalidateAll}
+        />
+
+        <div className="mt-4 text-xs font-bold uppercase text-muted-foreground">
+          Giấy phép lái xe
+        </div>
+        <Field
+          label="Hạng bằng"
+          value={licenseClass}
+          onChange={setLicenseClass}
+          placeholder="VD: B2"
+        />
+        <div className="mt-3">
+          <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Hạn sử dụng</div>
+          <input
+            type="date"
+            value={licenseExpiry}
+            onChange={(e) => setLicenseExpiry(e.target.value)}
+            className="w-full rounded-2xl bg-surface p-3.5 text-base outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+        <DocUploadRow
+          label="Ảnh GPLX"
+          driverId={driverId}
+          kind="license"
+          hasPhoto={!!kyc?.license_photo_url}
+          onUploaded={invalidateAll}
+        />
+
+        <div className="mt-4 text-xs font-bold uppercase text-muted-foreground">Khác</div>
+        <div className="mt-3">
+          <div className="mb-1.5 text-xs font-semibold text-muted-foreground">
+            Kinh nghiệm lái xe (năm)
+          </div>
+          <input
+            type="number"
+            min={0}
+            value={yearsExperience}
+            onChange={(e) => setYearsExperience(e.target.value)}
+            className="w-full rounded-2xl bg-surface p-3.5 text-base outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+        <Field
+          label="Người liên hệ khẩn cấp"
+          value={emergencyName}
+          onChange={setEmergencyName}
+          placeholder="Họ tên"
+        />
+        <Field
+          label="SĐT liên hệ khẩn cấp"
+          value={emergencyPhone}
+          onChange={setEmergencyPhone}
+          placeholder="09xxxxxxxx"
+        />
+
+        <button
+          onClick={save}
+          disabled={saving}
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3.5 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-60"
+        >
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          Lưu thay đổi
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div className="mt-3">
+      <div className="mb-1.5 text-xs font-semibold text-muted-foreground">{label}</div>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-2xl bg-surface p-3.5 text-base outline-none focus:ring-2 focus:ring-primary/40"
+      />
+    </div>
+  );
+}
+
+// Ảnh CCCD/GPLX upload thẳng lên bucket private "driver-docs" khi chọn file
+// (không đợi bấm "Lưu thay đổi") — giống BannerImageCell ở admin.promotions.tsx.
+function DocUploadRow({
+  label,
+  driverId,
+  kind,
+  hasPhoto,
+  onUploaded,
+}: {
+  label: string;
+  driverId: string;
+  kind: "id" | "license";
+  hasPhoto: boolean;
+  onUploaded: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    try {
+      await uploadDriverDoc(driverId, kind, file);
+      toast.success(`Đã tải ${label.toLowerCase()}`);
+      onUploaded();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không tải được ảnh.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="mt-3 flex items-center justify-between rounded-2xl bg-surface p-3.5">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        {hasPhoto && <CheckCircle2 className="h-4 w-4 text-success" />}
+        {label}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+        }}
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-xs font-bold disabled:opacity-60"
+      >
+        {uploading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <ImagePlus className="h-3.5 w-3.5" />
+        )}
+        {hasPhoto ? "Đổi ảnh" : "Tải ảnh"}
+      </button>
+    </div>
   );
 }

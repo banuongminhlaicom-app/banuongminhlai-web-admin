@@ -98,8 +98,15 @@ function Searching() {
         <div className="relative grid h-32 w-32 place-items-center">
           <div className="absolute inset-0 animate-ping rounded-full bg-primary/40" />
           <div className="absolute inset-4 animate-ping rounded-full bg-primary/60 [animation-delay:200ms]" />
-          <div className="relative grid h-16 w-16 place-items-center rounded-full gradient-primary shadow-glow text-2xl">
-            🚗
+          {/* Ảnh gốc có viền trắng mỏng quanh hình tròn đỏ — phóng to 125%
+              trong khung overflow-hidden để hình tròn đỏ phủ kín, không lộ
+              viền trắng ở mép khi bị cắt tròn. */}
+          <div className="relative h-16 w-16 overflow-hidden rounded-full shadow-glow">
+            <img
+              src="/icons/user-customer.png"
+              alt="Vị trí của bạn"
+              className="absolute left-1/2 top-1/2 h-[125%] w-[125%] -translate-x-1/2 -translate-y-1/2 object-cover"
+            />
           </div>
         </div>
       </div>
