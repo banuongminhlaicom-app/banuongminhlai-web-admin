@@ -163,7 +163,10 @@ export function TripChat({
               if (e.key === "Enter") send();
             }}
             placeholder="Nhập tin nhắn…"
-            className="h-11 flex-1 rounded-full border border-border bg-surface px-4 text-sm outline-none focus:border-primary"
+            // text-base (16px) chứ không phải text-sm (14px) — Safari iOS tự
+            // zoom trang khi input focus có font-size < 16px, khiến nút Gửi
+            // bị đẩy ra ngoài khung nhìn cho tới khi người dùng tự zoom out.
+            className="h-11 flex-1 rounded-full border border-border bg-surface px-4 text-base outline-none focus:border-primary"
           />
           <button
             onClick={() => send()}

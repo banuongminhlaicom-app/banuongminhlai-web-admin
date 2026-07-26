@@ -103,11 +103,18 @@ export async function ensureProfile(userId: string, role: UserRole, phone: strin
   const { error: profileError } = await supabase
     .from("profiles")
     .insert({ id: userId, role, phone });
-  if (profileError) throw profileError;
+  // 23505 = trùng khoá chính (unique_violation) — 1 lượt gọi ensureProfile()
+  // khác chạy song song (getSession() và onAuthStateChange() cùng bắn ra ngay
+  // sau khi quay lại từ OAuth) đã tạo hồ sơ trước rồi. Không phải lỗi thật —
+  // bỏ qua để không hiện toast "Không tạo được hồ sơ." dù thực ra vẫn vào được.
+  if (profileError) {
+    if (profileError.code === "23505") return;
+    throw profileError;
+  }
 
   if (role === "driver") {
     const { error: driverError } = await supabase.from("drivers").insert({ id: userId });
-    if (driverError) throw driverError;
+    if (driverError && driverError.code !== "23505") throw driverError;
   }
 
   if (role === "customer") {

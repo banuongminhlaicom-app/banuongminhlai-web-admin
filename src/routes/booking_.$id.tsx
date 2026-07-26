@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useRequireRole } from "@/lib/auth";
 import {
   cancelTrip,
+  createSupportTicket,
   getAssignedDriverInfo,
   getDriverLocation,
   getTrip,
@@ -335,7 +336,12 @@ function RealBookingDetail({ id }: { id: string }) {
         </div>
 
         {isFinal ? (
-          <RealCompletedSection tripId={id} onDone={() => navigate({ to: "/trips" })} />
+          <RealCompletedSection
+            tripId={id}
+            tripCode={trip.code}
+            customerId={trip.customer_id}
+            onDone={() => navigate({ to: "/trips" })}
+          />
         ) : (
           <div className="mt-4 space-y-2">
             <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4 text-center text-sm text-muted-foreground">
@@ -364,10 +370,21 @@ function RealBookingDetail({ id }: { id: string }) {
   );
 }
 
-function RealCompletedSection({ tripId, onDone }: { tripId: string; onDone: () => void }) {
+function RealCompletedSection({
+  tripId,
+  tripCode,
+  customerId,
+  onDone,
+}: {
+  tripId: string;
+  tripCode: string;
+  customerId: string;
+  onDone: () => void;
+}) {
   const [rating, setRating] = useState(5);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const submit = async () => {
     setSubmitting(true);
@@ -411,7 +428,10 @@ function RealCompletedSection({ tripId, onDone }: { tripId: string; onDone: () =
         />
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button className="rounded-2xl border border-border py-3 text-sm font-bold">
+        <button
+          onClick={() => setReporting(true)}
+          className="rounded-2xl border border-border py-3 text-sm font-bold"
+        >
           Báo cáo sự cố
         </button>
         <button
@@ -421,6 +441,83 @@ function RealCompletedSection({ tripId, onDone }: { tripId: string; onDone: () =
         >
           {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Gửi đánh giá
+        </button>
+      </div>
+
+      {reporting && (
+        <IncidentModal
+          tripCode={tripCode}
+          customerId={customerId}
+          onClose={() => setReporting(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Báo sự cố chuyến đi — gửi thành 1 ticket hỗ trợ thật (cùng bảng
+// support_tickets với support.tsx), kèm mã chuyến để admin biết đang nói
+// chuyến nào khi xử lý ở admin.support.tsx.
+function IncidentModal({
+  tripCode,
+  customerId,
+  onClose,
+}: {
+  tripCode: string;
+  customerId: string;
+  onClose: () => void;
+}) {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const submit = async () => {
+    if (!message.trim()) {
+      toast.error("Vui lòng mô tả sự cố.");
+      return;
+    }
+    setSending(true);
+    try {
+      await createSupportTicket(customerId, `Báo sự cố chuyến ${tripCode}`, message);
+      toast.success("Đã gửi báo cáo sự cố, chúng tôi sẽ liên hệ sớm.");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không gửi được báo cáo.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="safe-bottom w-full rounded-t-3xl bg-background p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-base font-black">Báo cáo sự cố</div>
+          <button
+            onClick={onClose}
+            aria-label="Đóng"
+            className="grid h-8 w-8 place-items-center rounded-full bg-surface"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={4}
+          autoFocus
+          placeholder="Mô tả chi tiết sự cố bạn gặp phải..."
+          className="w-full resize-none rounded-2xl bg-surface p-3.5 text-base outline-none focus:ring-2 focus:ring-primary/40"
+        />
+        <button
+          onClick={submit}
+          disabled={sending}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl gradient-primary py-3.5 text-sm font-bold text-primary-foreground shadow-glow disabled:opacity-60"
+        >
+          {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Gửi báo cáo
         </button>
       </div>
     </div>
