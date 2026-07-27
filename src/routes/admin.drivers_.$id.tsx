@@ -1,15 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { approveDriver, getDriverAdminDetail, getTripsByDriver } from "@/lib/queries";
+import { approveDriver, getDriverAdminDetail, getDriverKyc, getTripsByDriver } from "@/lib/queries";
 import { TRIP_STATUS_LABEL, type TripStatus } from "@/lib/mock";
 import { formatVND, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRequireRole } from "@/lib/auth";
+import { DocUploadRow } from "@/routes/driver.profile";
 
-export const Route = createFileRoute("/admin/drivers/$id")({
+export const Route = createFileRoute("/admin/drivers_/$id")({
   head: () => ({ meta: [{ title: "Admin · Chi tiết tài xế" }] }),
   component: AdminDriverDetail,
 });
@@ -47,6 +48,15 @@ function AdminDriverDetail() {
     queryKey: ["admin", "driver-trips", id],
     queryFn: () => getTripsByDriver(id),
   });
+  // Ảnh giấy tờ tuỳ thân — riêng tư, chỉ chính chủ + admin xem được (RLS
+  // stage18). Dùng để đối chiếu bằng mắt khi chưa có OCR/face-match tự động.
+  const { data: kyc } = useQuery({
+    queryKey: ["admin", "driver-kyc", id],
+    queryFn: () => getDriverKyc(id),
+  });
+  const invalidateKyc = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin", "driver-kyc", id] });
+  };
 
   const approveMutation = useMutation({
     mutationFn: (approved: boolean) => approveDriver(id, approved),
@@ -159,6 +169,57 @@ function AdminDriverDetail() {
           </div>
 
           <div className="rounded-3xl bg-surface p-5">
+            <h3 className="mb-1 text-xs font-black uppercase text-muted-foreground">
+              Giấy tờ xác minh (eKYC)
+            </h3>
+            <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+              Đối chiếu ảnh selfie với ảnh trên CCCD/GPLX bằng mắt trước khi phê duyệt.
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <DocThumb label="Selfie" url={kyc?.selfie_url ?? null} />
+              <DocThumb label="CCCD mặt trước" url={kyc?.id_photo_url ?? null} />
+              <DocThumb label="CCCD mặt sau" url={kyc?.id_photo_back_url ?? null} />
+              <DocThumb label="GPLX mặt trước" url={kyc?.license_photo_url ?? null} />
+              <DocThumb label="GPLX mặt sau" url={kyc?.license_photo_back_url ?? null} />
+            </div>
+            {kyc?.id_number && (
+              <div className="mt-3 flex justify-between rounded-xl bg-background p-2.5 text-sm">
+                <span className="text-muted-foreground">Số CCCD</span>
+                <span className="font-mono font-semibold">{kyc.id_number}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-3xl bg-surface p-5">
+            <h3 className="mb-1 text-xs font-black uppercase text-muted-foreground">
+              Tài liệu do Admin bổ sung
+            </h3>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Hạnh kiểm xác nhận địa phương + lý lịch tư pháp do admin thu thập và lưu vào hồ sơ tài
+              xế này.
+            </p>
+            <DocUploadRow
+              label="Hạnh kiểm xác nhận địa phương"
+              driverId={id}
+              kind="conduct_cert"
+              facing="environment"
+              photoUrl={kyc?.conduct_cert_url ?? null}
+              photoPath={kyc?.conduct_cert_path ?? null}
+              onUploaded={invalidateKyc}
+            />
+            <DocUploadRow
+              label="Lý lịch tư pháp"
+              driverId={id}
+              kind="background_check"
+              facing="environment"
+              photoUrl={kyc?.background_check_url ?? null}
+              photoPath={kyc?.background_check_path ?? null}
+              onUploaded={invalidateKyc}
+            />
+          </div>
+
+          <div className="rounded-3xl bg-surface p-5">
             <h3 className="mb-3 text-xs font-black uppercase text-muted-foreground">
               Chuyến gần đây
             </h3>
@@ -209,6 +270,25 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-3xl bg-surface p-4 text-center">
       <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="mt-1 text-lg font-black">{value}</div>
+    </div>
+  );
+}
+
+// Ảnh giấy tờ dùng signed URL (hết hạn sau 1 giờ) — bấm để xem cỡ đầy đủ ở
+// tab mới thay vì phóng to trong trang, đỡ phải tự dựng lightbox.
+function DocThumb({ label, url }: { label: string; url: string | null }) {
+  return (
+    <div className="overflow-hidden rounded-2xl bg-background">
+      {url ? (
+        <a href={url} target="_blank" rel="noreferrer" className="block">
+          <img src={url} alt={label} className="aspect-[4/3] w-full object-cover" />
+        </a>
+      ) : (
+        <div className="grid aspect-[4/3] w-full place-items-center text-[11px] text-muted-foreground">
+          Chưa tải lên
+        </div>
+      )}
+      <div className="p-2 text-center text-[11px] font-semibold text-muted-foreground">{label}</div>
     </div>
   );
 }

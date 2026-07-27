@@ -16,6 +16,7 @@ export default defineConfig({
   // (nên Geolocation API hoạt động, khác với lvh.me/http thường bị chặn).
   // Vẫn cần domain có dấu chấm để qua validation của Goong Maps API key.
   vite: {
-    server: { allowedHosts: ["app.localhost"] },
+    // Port 80: để truy cập bằng app.localhost không cần gõ thêm port.
+    server: { allowedHosts: ["app.localhost"], port: 80, strictPort: false },
   },
 });

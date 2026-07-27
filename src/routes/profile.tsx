@@ -4,9 +4,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   Car,
+  CheckCircle2,
   ChevronRight,
   CreditCard,
   Headphones,
+  ImagePlus,
   KeyRound,
   Loader2,
   LogOut,
@@ -21,7 +23,16 @@ import { MobileShell } from "@/components/MobileShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
 import { refreshProfile, signOutAuth, useAuthState, useRequireRole } from "@/lib/auth";
-import { getCustomerStats, updateMyProfile, uploadAvatar } from "@/lib/queries";
+import {
+  type CustomerDocKind,
+  type CustomerKycRow,
+  getCustomerKyc,
+  getCustomerStats,
+  updateCustomerKyc,
+  updateMyProfile,
+  uploadAvatar,
+  uploadCustomerDoc,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({ meta: [{ title: "Tài khoản" }] }),
@@ -63,6 +74,11 @@ function Profile() {
   const { data: stats } = useQuery({
     queryKey: ["customer-stats", userId],
     queryFn: () => getCustomerStats(userId!),
+    enabled: !!userId,
+  });
+  const { data: kyc } = useQuery({
+    queryKey: ["customer-kyc", userId],
+    queryFn: () => getCustomerKyc(userId!),
     enabled: !!userId,
   });
 
@@ -179,6 +195,7 @@ function Profile() {
           userId={userId}
           currentName={authState.profile?.full_name ?? ""}
           currentAvatar={authState.profile?.avatar_url ?? null}
+          kyc={kyc ?? null}
           onClose={() => setEditing(false)}
         />
       )}
@@ -200,19 +217,26 @@ function EditProfileModal({
   userId,
   currentName,
   currentAvatar,
+  kyc,
   onClose,
 }: {
   userId: string;
   currentName: string;
   currentAvatar: string | null;
+  kyc: CustomerKycRow | null;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(currentName);
+  const [idNumber, setIdNumber] = useState(kyc?.id_number ?? "");
   const [preview, setPreview] = useState<string | null>(currentAvatar);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const invalidateKyc = () => {
+    queryClient.invalidateQueries({ queryKey: ["customer-kyc", userId] });
+  };
 
   const pickFile = (file: File) => {
     setPendingFile(file);
@@ -228,8 +252,10 @@ function EditProfileModal({
     try {
       if (pendingFile) await uploadAvatar(userId, pendingFile);
       await updateMyProfile(userId, { full_name: name.trim() });
+      await updateCustomerKyc(userId, idNumber.trim());
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ["customer-stats", userId] });
+      invalidateKyc();
       toast.success("Đã cập nhật hồ sơ");
       onClose();
     } catch (err) {
@@ -299,6 +325,33 @@ function EditProfileModal({
           />
         </div>
 
+        <div className="mt-4 text-xs font-bold uppercase text-muted-foreground">
+          Xác thực danh tính (CCCD)
+        </div>
+        <div className="mt-3">
+          <div className="mb-1.5 text-xs font-semibold text-muted-foreground">Số CCCD</div>
+          <input
+            value={idNumber}
+            onChange={(e) => setIdNumber(e.target.value)}
+            placeholder="079xxxxxxxxx"
+            className="w-full rounded-2xl bg-surface p-3.5 text-base outline-none focus:ring-2 focus:ring-primary/40"
+          />
+        </div>
+        <DocUploadRow
+          label="Mặt trước CCCD"
+          userId={userId}
+          kind="id_front"
+          hasPhoto={!!kyc?.id_photo_url}
+          onUploaded={invalidateKyc}
+        />
+        <DocUploadRow
+          label="Mặt sau CCCD"
+          userId={userId}
+          kind="id_back"
+          hasPhoto={!!kyc?.id_photo_back_url}
+          onUploaded={invalidateKyc}
+        />
+
         <button
           onClick={save}
           disabled={saving}
@@ -308,6 +361,71 @@ function EditProfileModal({
           Lưu thay đổi
         </button>
       </div>
+    </div>
+  );
+}
+
+// Ảnh CCCD upload thẳng lên bucket private "customer-docs" khi chọn file
+// (không đợi bấm "Lưu thay đổi") — cùng cách với DocUploadRow ở driver.profile.tsx.
+function DocUploadRow({
+  label,
+  userId,
+  kind,
+  hasPhoto,
+  onUploaded,
+}: {
+  label: string;
+  userId: string;
+  kind: CustomerDocKind;
+  hasPhoto: boolean;
+  onUploaded: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    try {
+      await uploadCustomerDoc(userId, kind, file);
+      toast.success(`Đã tải ${label.toLowerCase()}`);
+      onUploaded();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không tải được ảnh.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div className="mt-3 flex items-center justify-between rounded-2xl bg-surface p-3.5">
+      <div className="flex items-center gap-2 text-sm font-semibold">
+        {hasPhoto && <CheckCircle2 className="h-4 w-4 text-success" />}
+        {label}
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFile(file);
+        }}
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="flex items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-xs font-bold disabled:opacity-60"
+      >
+        {uploading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <ImagePlus className="h-3.5 w-3.5" />
+        )}
+        {hasPhoto ? "Đổi ảnh" : "Tải ảnh"}
+      </button>
     </div>
   );
 }

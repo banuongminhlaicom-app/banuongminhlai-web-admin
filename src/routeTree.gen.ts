@@ -46,8 +46,9 @@ import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
 import { Route as DriverTripsIndexRouteImport } from './routes/driver.trips.index'
 import { Route as DriverTripsIdRouteImport } from './routes/driver.trips.$id'
-import { Route as AdminDriversIdRouteImport } from './routes/admin.drivers.$id'
-import { Route as AdminBookingsIdRouteImport } from './routes/admin.bookings.$id'
+import { Route as AdminDriversIdRouteImport } from './routes/admin.drivers_.$id'
+import { Route as AdminCustomersIdRouteImport } from './routes/admin.customers_.$id'
+import { Route as AdminBookingsIdRouteImport } from './routes/admin.bookings_.$id'
 
 const WalletRoute = WalletRouteImport.update({
   id: '/wallet',
@@ -235,14 +236,19 @@ const DriverTripsIdRoute = DriverTripsIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminDriversIdRoute = AdminDriversIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminDriversRoute,
+  id: '/admin/drivers_/$id',
+  path: '/admin/drivers/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCustomersIdRoute = AdminCustomersIdRouteImport.update({
+  id: '/admin/customers_/$id',
+  path: '/admin/customers/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminBookingsIdRoute = AdminBookingsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminBookingsRoute,
+  id: '/admin/bookings_/$id',
+  path: '/admin/bookings/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -265,9 +271,9 @@ export interface FileRoutesByFullPath {
   '/vehicles': typeof VehiclesRoute
   '/verify-otp': typeof VerifyOtpRoute
   '/wallet': typeof WalletRoute
-  '/admin/bookings': typeof AdminBookingsRouteWithChildren
+  '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
-  '/admin/drivers': typeof AdminDriversRouteWithChildren
+  '/admin/drivers': typeof AdminDriversRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/pricing': typeof AdminPricingRoute
   '/admin/promotions': typeof AdminPromotionsRoute
@@ -282,6 +288,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/driver/': typeof DriverIndexRoute
   '/admin/bookings/$id': typeof AdminBookingsIdRoute
+  '/admin/customers/$id': typeof AdminCustomersIdRoute
   '/admin/drivers/$id': typeof AdminDriversIdRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips/': typeof DriverTripsIndexRoute
@@ -306,9 +313,9 @@ export interface FileRoutesByTo {
   '/vehicles': typeof VehiclesRoute
   '/verify-otp': typeof VerifyOtpRoute
   '/wallet': typeof WalletRoute
-  '/admin/bookings': typeof AdminBookingsRouteWithChildren
+  '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
-  '/admin/drivers': typeof AdminDriversRouteWithChildren
+  '/admin/drivers': typeof AdminDriversRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/pricing': typeof AdminPricingRoute
   '/admin/promotions': typeof AdminPromotionsRoute
@@ -323,6 +330,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/driver': typeof DriverIndexRoute
   '/admin/bookings/$id': typeof AdminBookingsIdRoute
+  '/admin/customers/$id': typeof AdminCustomersIdRoute
   '/admin/drivers/$id': typeof AdminDriversIdRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips': typeof DriverTripsIndexRoute
@@ -348,9 +356,9 @@ export interface FileRoutesById {
   '/vehicles': typeof VehiclesRoute
   '/verify-otp': typeof VerifyOtpRoute
   '/wallet': typeof WalletRoute
-  '/admin/bookings': typeof AdminBookingsRouteWithChildren
+  '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
-  '/admin/drivers': typeof AdminDriversRouteWithChildren
+  '/admin/drivers': typeof AdminDriversRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/pricing': typeof AdminPricingRoute
   '/admin/promotions': typeof AdminPromotionsRoute
@@ -364,8 +372,9 @@ export interface FileRoutesById {
   '/driver/profile': typeof DriverProfileRoute
   '/admin/': typeof AdminIndexRoute
   '/driver/': typeof DriverIndexRoute
-  '/admin/bookings/$id': typeof AdminBookingsIdRoute
-  '/admin/drivers/$id': typeof AdminDriversIdRoute
+  '/admin/bookings_/$id': typeof AdminBookingsIdRoute
+  '/admin/customers_/$id': typeof AdminCustomersIdRoute
+  '/admin/drivers_/$id': typeof AdminDriversIdRoute
   '/driver/trips/$id': typeof DriverTripsIdRoute
   '/driver/trips/': typeof DriverTripsIndexRoute
 }
@@ -408,6 +417,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/driver/'
     | '/admin/bookings/$id'
+    | '/admin/customers/$id'
     | '/admin/drivers/$id'
     | '/driver/trips/$id'
     | '/driver/trips/'
@@ -449,6 +459,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/driver'
     | '/admin/bookings/$id'
+    | '/admin/customers/$id'
     | '/admin/drivers/$id'
     | '/driver/trips/$id'
     | '/driver/trips'
@@ -489,8 +500,9 @@ export interface FileRouteTypes {
     | '/driver/profile'
     | '/admin/'
     | '/driver/'
-    | '/admin/bookings/$id'
-    | '/admin/drivers/$id'
+    | '/admin/bookings_/$id'
+    | '/admin/customers_/$id'
+    | '/admin/drivers_/$id'
     | '/driver/trips/$id'
     | '/driver/trips/'
   fileRoutesById: FileRoutesById
@@ -515,9 +527,9 @@ export interface RootRouteChildren {
   VehiclesRoute: typeof VehiclesRoute
   VerifyOtpRoute: typeof VerifyOtpRoute
   WalletRoute: typeof WalletRoute
-  AdminBookingsRoute: typeof AdminBookingsRouteWithChildren
+  AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCustomersRoute: typeof AdminCustomersRoute
-  AdminDriversRoute: typeof AdminDriversRouteWithChildren
+  AdminDriversRoute: typeof AdminDriversRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminPricingRoute: typeof AdminPricingRoute
   AdminPromotionsRoute: typeof AdminPromotionsRoute
@@ -531,6 +543,9 @@ export interface RootRouteChildren {
   DriverProfileRoute: typeof DriverProfileRoute
   AdminIndexRoute: typeof AdminIndexRoute
   DriverIndexRoute: typeof DriverIndexRoute
+  AdminBookingsIdRoute: typeof AdminBookingsIdRoute
+  AdminCustomersIdRoute: typeof AdminCustomersIdRoute
+  AdminDriversIdRoute: typeof AdminDriversIdRoute
   DriverTripsIdRoute: typeof DriverTripsIdRoute
   DriverTripsIndexRoute: typeof DriverTripsIndexRoute
 }
@@ -796,46 +811,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DriverTripsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/drivers/$id': {
-      id: '/admin/drivers/$id'
-      path: '/$id'
+    '/admin/drivers_/$id': {
+      id: '/admin/drivers_/$id'
+      path: '/admin/drivers/$id'
       fullPath: '/admin/drivers/$id'
       preLoaderRoute: typeof AdminDriversIdRouteImport
-      parentRoute: typeof AdminDriversRoute
+      parentRoute: typeof rootRouteImport
     }
-    '/admin/bookings/$id': {
-      id: '/admin/bookings/$id'
-      path: '/$id'
+    '/admin/customers_/$id': {
+      id: '/admin/customers_/$id'
+      path: '/admin/customers/$id'
+      fullPath: '/admin/customers/$id'
+      preLoaderRoute: typeof AdminCustomersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/bookings_/$id': {
+      id: '/admin/bookings_/$id'
+      path: '/admin/bookings/$id'
       fullPath: '/admin/bookings/$id'
       preLoaderRoute: typeof AdminBookingsIdRouteImport
-      parentRoute: typeof AdminBookingsRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface AdminBookingsRouteChildren {
-  AdminBookingsIdRoute: typeof AdminBookingsIdRoute
-}
-
-const AdminBookingsRouteChildren: AdminBookingsRouteChildren = {
-  AdminBookingsIdRoute: AdminBookingsIdRoute,
-}
-
-const AdminBookingsRouteWithChildren = AdminBookingsRoute._addFileChildren(
-  AdminBookingsRouteChildren,
-)
-
-interface AdminDriversRouteChildren {
-  AdminDriversIdRoute: typeof AdminDriversIdRoute
-}
-
-const AdminDriversRouteChildren: AdminDriversRouteChildren = {
-  AdminDriversIdRoute: AdminDriversIdRoute,
-}
-
-const AdminDriversRouteWithChildren = AdminDriversRoute._addFileChildren(
-  AdminDriversRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -857,9 +855,9 @@ const rootRouteChildren: RootRouteChildren = {
   VehiclesRoute: VehiclesRoute,
   VerifyOtpRoute: VerifyOtpRoute,
   WalletRoute: WalletRoute,
-  AdminBookingsRoute: AdminBookingsRouteWithChildren,
+  AdminBookingsRoute: AdminBookingsRoute,
   AdminCustomersRoute: AdminCustomersRoute,
-  AdminDriversRoute: AdminDriversRouteWithChildren,
+  AdminDriversRoute: AdminDriversRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminPricingRoute: AdminPricingRoute,
   AdminPromotionsRoute: AdminPromotionsRoute,
@@ -873,6 +871,9 @@ const rootRouteChildren: RootRouteChildren = {
   DriverProfileRoute: DriverProfileRoute,
   AdminIndexRoute: AdminIndexRoute,
   DriverIndexRoute: DriverIndexRoute,
+  AdminBookingsIdRoute: AdminBookingsIdRoute,
+  AdminCustomersIdRoute: AdminCustomersIdRoute,
+  AdminDriversIdRoute: AdminDriversIdRoute,
   DriverTripsIdRoute: DriverTripsIdRoute,
   DriverTripsIndexRoute: DriverTripsIndexRoute,
 }

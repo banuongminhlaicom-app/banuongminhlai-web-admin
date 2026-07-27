@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useRequireRole } from "@/lib/auth";
 import {
+  type AssignedDriverInfo,
   cancelTrip,
   createSupportTicket,
   getAssignedDriverInfo,
@@ -115,6 +116,7 @@ function RealBookingDetail({ id }: { id: string }) {
   }, [trip?.status, id, navigate]);
 
   const [chatOpen, setChatOpen] = useState(false);
+  const [showDriverProfile, setShowDriverProfile] = useState(false);
   // Báo có tin nhắn mới từ tài xế (âm thanh + toast + badge) khi khách không
   // đang mở sẵn khung chat — để không bỏ lỡ dù đang xem màn khác.
   const { unreadCount: chatUnread } = useTripChatAlerts({
@@ -247,14 +249,25 @@ function RealBookingDetail({ id }: { id: string }) {
 
         {driver ? (
           <div className="mt-3 rounded-3xl bg-surface p-4">
-            <div className="flex items-center gap-3">
-              <div className="grid h-14 w-14 place-items-center rounded-2xl gradient-primary text-lg font-black text-primary-foreground shadow-glow">
-                {(driver.full_name ?? "Tài xế")
-                  .split(" ")
-                  .slice(-2)
-                  .map((w) => w[0])
-                  .join("")}
-              </div>
+            <button
+              onClick={() => setShowDriverProfile(true)}
+              className="flex w-full items-center gap-3 text-left"
+            >
+              {driver.avatar_url ? (
+                <img
+                  src={driver.avatar_url}
+                  alt={driver.full_name ?? "Tài xế"}
+                  className="h-14 w-14 rounded-2xl object-cover shadow-glow"
+                />
+              ) : (
+                <div className="grid h-14 w-14 place-items-center rounded-2xl gradient-primary text-lg font-black text-primary-foreground shadow-glow">
+                  {(driver.full_name ?? "Tài xế")
+                    .split(" ")
+                    .slice(-2)
+                    .map((w) => w[0])
+                    .join("")}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="text-base font-bold">{driver.full_name ?? "Tài xế"}</div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -269,7 +282,10 @@ function RealBookingDetail({ id }: { id: string }) {
                   <div className="mt-1 text-xs text-muted-foreground">SĐT: {driver.phone}</div>
                 )}
               </div>
-            </div>
+              <div className="rounded-full bg-background px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
+                Xem hồ sơ
+              </div>
+            </button>
 
             {!isFinal && (
               <div className="mt-3 grid grid-cols-3 gap-2">
@@ -366,6 +382,83 @@ function RealBookingDetail({ id }: { id: string }) {
           onClose={() => setChatOpen(false)}
         />
       )}
+
+      {showDriverProfile && driver && (
+        <DriverProfileModal driver={driver} onClose={() => setShowDriverProfile(false)} />
+      )}
+    </div>
+  );
+}
+
+// Hồ sơ tài xế cho KHÁCH xem — cố ý chỉ hiện thông tin đã xác minh (tên, ảnh,
+// rating, kinh nghiệm, hạng GPLX), KHÔNG hiện số CCCD hay ảnh giấy tờ gốc
+// (dữ liệu đó riêng tư, chỉ tài xế + admin xem qua getDriverKyc).
+function DriverProfileModal({
+  driver,
+  onClose,
+}: {
+  driver: AssignedDriverInfo;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={onClose}>
+      <div
+        className="safe-bottom w-full rounded-t-3xl bg-background p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-base font-black">Hồ sơ tài xế</div>
+          <button
+            onClick={onClose}
+            aria-label="Đóng"
+            className="grid h-8 w-8 place-items-center rounded-full bg-surface"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center text-center">
+          {driver.avatar_url ? (
+            <img
+              src={driver.avatar_url}
+              alt={driver.full_name ?? "Tài xế"}
+              className="h-24 w-24 rounded-full object-cover shadow-glow"
+            />
+          ) : (
+            <div className="grid h-24 w-24 place-items-center rounded-full gradient-primary text-2xl font-black text-primary-foreground shadow-glow">
+              {(driver.full_name ?? "Tài xế")
+                .split(" ")
+                .slice(-2)
+                .map((w) => w[0])
+                .join("")}
+            </div>
+          )}
+          <div className="mt-3 text-lg font-bold">{driver.full_name ?? "Tài xế"}</div>
+          <div className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+            <Star className="h-4 w-4 fill-warning text-warning" /> {driver.rating.toFixed(1)}
+            <span>· {driver.trips_count} chuyến</span>
+          </div>
+        </div>
+
+        <div className="mt-5 divide-y divide-border rounded-2xl bg-surface px-4">
+          <ProfileRow label="Số năm kinh nghiệm" value={`${driver.years_experience} năm`} />
+          <ProfileRow label="Hạng GPLX" value={driver.license_class ?? "—"} />
+          <ProfileRow label="Loại xe" value={driver.vehicle_class ?? "—"} />
+        </div>
+
+        <div className="mt-4 rounded-2xl bg-primary/5 p-3 text-center text-xs text-muted-foreground">
+          Giấy tờ tuỳ thân của tài xế đã được đội ngũ BUML xác minh trước khi được nhận chuyến.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-semibold">{value}</span>
     </div>
   );
 }

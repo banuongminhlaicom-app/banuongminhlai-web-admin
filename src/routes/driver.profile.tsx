@@ -1,12 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, ImagePlus, Loader2, LogOut, Pencil, Star, X } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ImagePlus,
+  Loader2,
+  LogOut,
+  Pencil,
+  Star,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { DriverShell } from "@/components/DriverShell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { refreshProfile, signOutAuth, useAuthState, useRequireRole } from "@/lib/auth";
 import {
+  deleteDriverDoc,
+  type DriverDocKind,
   getDriverKyc,
   getDriverSelf,
   updateDriverKyc,
@@ -59,9 +71,9 @@ function DriverProfile() {
   const expiry = formatExpiry(kyc?.license_expiry ?? null);
   const docs = [
     {
-      label: "Ảnh chân dung",
-      value: authState.profile?.avatar_url ? "Đã tải lên" : "Chưa cập nhật",
-      verified: !!authState.profile?.avatar_url,
+      label: "Ảnh xác thực khuôn mặt (selfie)",
+      value: kyc?.selfie_url ? "Đã tải lên" : "Chưa cập nhật",
+      verified: !!kyc?.selfie_url,
     },
     { label: "Họ tên", value: fullName, verified: !!authState.profile?.full_name },
     {
@@ -72,14 +84,14 @@ function DriverProfile() {
     {
       label: "Căn cước công dân",
       value: kyc?.id_number ?? "Chưa cập nhật",
-      verified: !!kyc?.id_number,
+      verified: !!kyc?.id_number && !!kyc?.id_photo_url && !!kyc?.id_photo_back_url,
     },
     {
       label: "Giấy phép lái xe",
       value: kyc?.license_class
         ? `Hạng ${kyc.license_class}${expiry ? ` · HSD ${expiry}` : ""}`
         : "Chưa cập nhật",
-      verified: !!kyc?.license_class,
+      verified: !!kyc?.license_class && !!kyc?.license_photo_url && !!kyc?.license_photo_back_url,
     },
     {
       label: "Kinh nghiệm lái xe",
@@ -315,14 +327,38 @@ function EditDriverProfileModal({
         <Field label="Họ tên" value={name} onChange={setName} placeholder="Nhập họ tên" />
 
         <div className="mt-4 text-xs font-bold uppercase text-muted-foreground">
+          Xác thực khuôn mặt
+        </div>
+        <DocUploadRow
+          label="Ảnh chân dung (selfie)"
+          driverId={driverId}
+          kind="selfie"
+          facing="user"
+          photoUrl={kyc?.selfie_url ?? null}
+          photoPath={kyc?.selfie_path ?? null}
+          onUploaded={invalidateAll}
+        />
+
+        <div className="mt-4 text-xs font-bold uppercase text-muted-foreground">
           Căn cước công dân
         </div>
         <Field label="Số CCCD" value={idNumber} onChange={setIdNumber} placeholder="079xxxxxxxxx" />
         <DocUploadRow
-          label="Ảnh CCCD"
+          label="Mặt trước CCCD"
           driverId={driverId}
-          kind="id"
-          hasPhoto={!!kyc?.id_photo_url}
+          kind="id_front"
+          facing="environment"
+          photoUrl={kyc?.id_photo_url ?? null}
+          photoPath={kyc?.id_photo_path ?? null}
+          onUploaded={invalidateAll}
+        />
+        <DocUploadRow
+          label="Mặt sau CCCD"
+          driverId={driverId}
+          kind="id_back"
+          facing="environment"
+          photoUrl={kyc?.id_photo_back_url ?? null}
+          photoPath={kyc?.id_photo_back_path ?? null}
           onUploaded={invalidateAll}
         />
 
@@ -345,10 +381,21 @@ function EditDriverProfileModal({
           />
         </div>
         <DocUploadRow
-          label="Ảnh GPLX"
+          label="Mặt trước GPLX"
           driverId={driverId}
-          kind="license"
-          hasPhoto={!!kyc?.license_photo_url}
+          kind="license_front"
+          facing="environment"
+          photoUrl={kyc?.license_photo_url ?? null}
+          photoPath={kyc?.license_photo_path ?? null}
+          onUploaded={invalidateAll}
+        />
+        <DocUploadRow
+          label="Mặt sau GPLX"
+          driverId={driverId}
+          kind="license_back"
+          facing="environment"
+          photoUrl={kyc?.license_photo_back_url ?? null}
+          photoPath={kyc?.license_photo_back_path ?? null}
           onUploaded={invalidateAll}
         />
 
@@ -417,21 +464,28 @@ function Field({
 
 // Ảnh CCCD/GPLX upload thẳng lên bucket private "driver-docs" khi chọn file
 // (không đợi bấm "Lưu thay đổi") — giống BannerImageCell ở admin.promotions.tsx.
-function DocUploadRow({
+// Có preview ảnh đã tải + nút xoá riêng, không chỉ mỗi toast xác nhận.
+export function DocUploadRow({
   label,
   driverId,
   kind,
-  hasPhoto,
+  facing,
+  photoUrl,
+  photoPath,
   onUploaded,
 }: {
   label: string;
   driverId: string;
-  kind: "id" | "license";
-  hasPhoto: boolean;
+  kind: DriverDocKind;
+  // "user": camera trước (selfie) — "environment": camera sau (chụp giấy tờ).
+  facing: "user" | "environment";
+  photoUrl: string | null;
+  photoPath: string | null;
   onUploaded: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleFile = async (file: File) => {
     setUploading(true);
@@ -447,34 +501,70 @@ function DocUploadRow({
     }
   };
 
+  const handleDelete = async () => {
+    if (!photoPath) return;
+    setDeleting(true);
+    try {
+      await deleteDriverDoc(driverId, kind, photoPath);
+      toast.success(`Đã xoá ${label.toLowerCase()}`);
+      onUploaded();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không xoá được ảnh.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="mt-3 flex items-center justify-between rounded-2xl bg-surface p-3.5">
-      <div className="flex items-center gap-2 text-sm font-semibold">
-        {hasPhoto && <CheckCircle2 className="h-4 w-4 text-success" />}
-        {label}
+    <div className="mt-3 rounded-2xl bg-surface p-3.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          {photoUrl && <CheckCircle2 className="h-4 w-4 text-success" />}
+          {label}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture={facing}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || deleting}
+            className="flex items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-xs font-bold disabled:opacity-60"
+          >
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ImagePlus className="h-3.5 w-3.5" />
+            )}
+            {photoUrl ? "Đổi ảnh" : "Tải ảnh"}
+          </button>
+          {photoUrl && (
+            <button
+              onClick={handleDelete}
+              disabled={uploading || deleting}
+              aria-label={`Xoá ${label.toLowerCase()}`}
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-destructive/15 text-destructive disabled:opacity-60"
+            >
+              {deleting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) handleFile(file);
-        }}
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-        className="flex items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-xs font-bold disabled:opacity-60"
-      >
-        {uploading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <ImagePlus className="h-3.5 w-3.5" />
-        )}
-        {hasPhoto ? "Đổi ảnh" : "Tải ảnh"}
-      </button>
+      {photoUrl && (
+        <img src={photoUrl} alt={label} className="mt-3 h-32 w-full rounded-xl object-cover" />
+      )}
     </div>
   );
 }

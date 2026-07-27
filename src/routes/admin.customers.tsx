@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
@@ -43,8 +43,16 @@ function AdminCustomers() {
                 </tr>
               ) : (
                 customers.map((c) => (
-                  <tr key={c.id}>
-                    <td className="p-4 font-semibold">{c.full_name ?? "Chưa cập nhật tên"}</td>
+                  <tr key={c.id} className="cursor-pointer hover:bg-background/50">
+                    <td className="p-0">
+                      <Link
+                        to="/admin/customers/$id"
+                        params={{ id: c.id }}
+                        className="block p-4 font-semibold"
+                      >
+                        {c.full_name ?? "Chưa cập nhật tên"}
+                      </Link>
+                    </td>
                     <td className="p-4 text-muted-foreground">{c.phone ?? "—"}</td>
                     <td className="p-4 font-black">—</td>
                     <td className="p-4 text-muted-foreground">

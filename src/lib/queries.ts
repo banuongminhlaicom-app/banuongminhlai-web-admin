@@ -135,18 +135,23 @@ export interface AssignedDriverInfo {
   id: string;
   full_name: string | null;
   phone: string | null;
+  avatar_url: string | null;
   rating: number;
   trips_count: number;
   years_experience: number;
   vehicle_class: string | null;
+  license_class: string | null;
 }
 
+// Thông tin hiện cho KHÁCH xem về tài xế đang phục vụ chuyến — cố ý KHÔNG lấy
+// id_number/id_photo_path/license_photo_path (giấy tờ tuỳ thân riêng tư của
+// tài xế, chỉ tài xế + admin xem được, xem getDriverKyc).
 export async function getAssignedDriverInfo(driverId: string): Promise<AssignedDriverInfo | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, full_name, phone, drivers!inner(rating, trips_count, years_experience, vehicle_class)",
+      "id, full_name, phone, avatar_url, drivers!inner(rating, trips_count, years_experience, vehicle_class, license_class)",
     )
     .eq("id", driverId)
     .maybeSingle();
@@ -157,10 +162,12 @@ export async function getAssignedDriverInfo(driverId: string): Promise<AssignedD
     id: data.id,
     full_name: data.full_name,
     phone: data.phone,
+    avatar_url: data.avatar_url,
     rating: d?.rating ?? 5,
     trips_count: d?.trips_count ?? 0,
     years_experience: d?.years_experience ?? 0,
     vehicle_class: d?.vehicle_class ?? null,
+    license_class: d?.license_class ?? null,
   };
 }
 
@@ -448,6 +455,21 @@ export async function getTripsByDriver(driverId: string, limit = 20): Promise<Tr
   return data ?? [];
 }
 
+// Lịch sử chuyến của 1 khách hàng — dùng ở admin.customers.$id.tsx.
+export async function getTripsByCustomer(customerId: string, limit = 20): Promise<TripRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("trips")
+    .select(
+      "id, code, customer_id, driver_id, pickup_address, dropoff_address, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, duration_min, vehicle_type, payment_method, price, promotion_id, note, status, customer_rating, customer_feedback, started_at, created_at",
+    )
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ---------------------------------------------------------------------------
 // Customers (admin.customers.tsx)
 // ---------------------------------------------------------------------------
@@ -467,6 +489,45 @@ export async function getCustomers(): Promise<CustomerRow[]> {
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data ?? [];
+}
+
+// Hồ sơ đầy đủ hơn CustomerRow — dùng cho màn admin.customers.$id.tsx.
+export interface CustomerDetail extends CustomerRow {
+  avatar_url: string | null;
+  rating: number;
+  trips_count: number;
+  points: number;
+}
+
+export async function getCustomerDetail(customerId: string): Promise<CustomerDetail | null> {
+  if (!supabase) return null;
+  const [profileRes, tripsRes, pointsRow] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, phone, avatar_url, rating, created_at")
+      .eq("id", customerId)
+      .maybeSingle(),
+    supabase
+      .from("trips")
+      .select("id", { count: "exact", head: true })
+      .eq("customer_id", customerId)
+      .eq("status", "completed"),
+    getLoyaltyPoints(customerId),
+  ]);
+  if (profileRes.error) throw profileRes.error;
+  if (!profileRes.data) return null;
+  if (tripsRes.error) throw tripsRes.error;
+
+  return {
+    id: profileRes.data.id,
+    full_name: profileRes.data.full_name,
+    phone: profileRes.data.phone,
+    avatar_url: profileRes.data.avatar_url,
+    rating: profileRes.data.rating ?? 5,
+    created_at: profileRes.data.created_at,
+    trips_count: tripsRes.count ?? 0,
+    points: pointsRow?.balance ?? 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1025,16 +1086,29 @@ export interface DriverKycRow {
   years_experience: number;
   vehicle_class: string | null;
   id_number: string | null;
+  id_photo_path: string | null;
   id_photo_url: string | null;
+  id_photo_back_path: string | null;
+  id_photo_back_url: string | null;
   license_class: string | null;
   license_expiry: string | null;
+  license_photo_path: string | null;
   license_photo_url: string | null;
+  license_photo_back_path: string | null;
+  license_photo_back_url: string | null;
+  selfie_path: string | null;
+  selfie_url: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  // 2 giấy tờ do ADMIN tự bổ sung (không phải tài xế nộp) — stage21.
+  conduct_cert_path: string | null;
+  conduct_cert_url: string | null;
+  background_check_path: string | null;
+  background_check_url: string | null;
 }
 
 const DRIVER_KYC_COLUMNS =
-  "years_experience, vehicle_class, id_number, id_photo_path, license_class, license_expiry, license_photo_path, emergency_contact_name, emergency_contact_phone";
+  "years_experience, vehicle_class, id_number, id_photo_path, id_photo_back_path, license_class, license_expiry, license_photo_path, license_photo_back_path, selfie_path, emergency_contact_name, emergency_contact_phone, conduct_cert_path, background_check_path";
 
 async function signDriverDocPath(path: string | null): Promise<string | null> {
   if (!supabase || !path) return null;
@@ -1052,21 +1126,46 @@ export async function getDriverKyc(driverId: string): Promise<DriverKycRow | nul
   if (error) throw error;
   if (!data) return null;
 
-  const [id_photo_url, license_photo_url] = await Promise.all([
+  const [
+    id_photo_url,
+    id_photo_back_url,
+    license_photo_url,
+    license_photo_back_url,
+    selfie_url,
+    conduct_cert_url,
+    background_check_url,
+  ] = await Promise.all([
     signDriverDocPath(data.id_photo_path),
+    signDriverDocPath(data.id_photo_back_path),
     signDriverDocPath(data.license_photo_path),
+    signDriverDocPath(data.license_photo_back_path),
+    signDriverDocPath(data.selfie_path),
+    signDriverDocPath(data.conduct_cert_path),
+    signDriverDocPath(data.background_check_path),
   ]);
 
   return {
     years_experience: data.years_experience,
     vehicle_class: data.vehicle_class,
     id_number: data.id_number,
+    id_photo_path: data.id_photo_path,
     id_photo_url,
+    id_photo_back_path: data.id_photo_back_path,
+    id_photo_back_url,
     license_class: data.license_class,
     license_expiry: data.license_expiry,
+    license_photo_path: data.license_photo_path,
     license_photo_url,
+    license_photo_back_path: data.license_photo_back_path,
+    license_photo_back_url,
+    selfie_path: data.selfie_path,
+    selfie_url,
     emergency_contact_name: data.emergency_contact_name,
     emergency_contact_phone: data.emergency_contact_phone,
+    conduct_cert_path: data.conduct_cert_path,
+    conduct_cert_url,
+    background_check_path: data.background_check_path,
+    background_check_url,
   };
 }
 
@@ -1087,12 +1186,25 @@ export async function updateDriverKyc(
   if (error) throw error;
 }
 
-// Upload ảnh CCCD/GPLX vào bucket private "driver-docs", ghi path (không phải
-// URL) vào drivers.id_photo_path/license_photo_path, trả về 1 signed URL để
-// hiển thị ngay không cần chờ query lại.
+// Upload ảnh CCCD/GPLX (mặt trước/sau) + selfie vào bucket private
+// "driver-docs", ghi path (không phải URL) vào cột tương ứng của drivers, trả
+// về 1 signed URL để hiển thị ngay không cần chờ query lại.
+const DRIVER_DOC_COLUMN = {
+  id_front: "id_photo_path",
+  id_back: "id_photo_back_path",
+  license_front: "license_photo_path",
+  license_back: "license_photo_back_path",
+  selfie: "selfie_path",
+  // 2 loại này do ADMIN tải lên (không phải tài xế), xem uploadDriverDoc.
+  conduct_cert: "conduct_cert_path",
+  background_check: "background_check_path",
+} as const;
+
+export type DriverDocKind = keyof typeof DRIVER_DOC_COLUMN;
+
 export async function uploadDriverDoc(
   driverId: string,
-  kind: "id" | "license",
+  kind: DriverDocKind,
   file: File,
 ): Promise<string | null> {
   if (!supabase) throw new Error("Supabase chưa được cấu hình.");
@@ -1103,7 +1215,7 @@ export async function uploadDriverDoc(
     .upload(path, file, { upsert: true });
   if (uploadError) throw uploadError;
 
-  const column = kind === "id" ? "id_photo_path" : "license_photo_path";
+  const column = DRIVER_DOC_COLUMN[kind];
   const { error: updateError } = await supabase
     .from("drivers")
     .update({ [column]: path })
@@ -1111,6 +1223,101 @@ export async function uploadDriverDoc(
   if (updateError) throw updateError;
 
   return signDriverDocPath(path);
+}
+
+// Xoá 1 ảnh giấy tờ đã tải (driver tự xoá của mình, hoặc admin xoá giấy tờ đã
+// bổ sung) — xoá file khỏi storage rồi clear cột path tương ứng.
+export async function deleteDriverDoc(
+  driverId: string,
+  kind: DriverDocKind,
+  path: string,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error: removeError } = await supabase.storage.from("driver-docs").remove([path]);
+  if (removeError) throw removeError;
+
+  const column = DRIVER_DOC_COLUMN[kind];
+  const { error: updateError } = await supabase
+    .from("drivers")
+    .update({ [column]: null })
+    .eq("id", driverId);
+  if (updateError) throw updateError;
+}
+
+// ---------------------------------------------------------------------------
+// Hồ sơ giấy tờ khách hàng (profile.tsx, stage20) — song song với KYC tài xế
+// nhưng chỉ CCCD (khách không có GPLX/selfie riêng). Lưu path trong bucket
+// private "customer-docs", đổi thành signed URL mỗi lần hiển thị.
+// ---------------------------------------------------------------------------
+export interface CustomerKycRow {
+  id_number: string | null;
+  id_photo_url: string | null;
+  id_photo_back_url: string | null;
+}
+
+const CUSTOMER_KYC_COLUMNS = "id_number, id_photo_path, id_photo_back_path";
+
+async function signCustomerDocPath(path: string | null): Promise<string | null> {
+  if (!supabase || !path) return null;
+  const { data } = await supabase.storage.from("customer-docs").createSignedUrl(path, 3600);
+  return data?.signedUrl ?? null;
+}
+
+export async function getCustomerKyc(customerId: string): Promise<CustomerKycRow | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(CUSTOMER_KYC_COLUMNS)
+    .eq("id", customerId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const [id_photo_url, id_photo_back_url] = await Promise.all([
+    signCustomerDocPath(data.id_photo_path),
+    signCustomerDocPath(data.id_photo_back_path),
+  ]);
+
+  return { id_number: data.id_number, id_photo_url, id_photo_back_url };
+}
+
+export async function updateCustomerKyc(customerId: string, idNumber: string): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("profiles")
+    .update({ id_number: idNumber || null })
+    .eq("id", customerId);
+  if (error) throw error;
+}
+
+const CUSTOMER_DOC_COLUMN = {
+  id_front: "id_photo_path",
+  id_back: "id_photo_back_path",
+} as const;
+
+export type CustomerDocKind = keyof typeof CUSTOMER_DOC_COLUMN;
+
+export async function uploadCustomerDoc(
+  customerId: string,
+  kind: CustomerDocKind,
+  file: File,
+): Promise<string | null> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const path = `${customerId}/${kind}.${ext}`;
+  const { error: uploadError } = await supabase.storage
+    .from("customer-docs")
+    .upload(path, file, { upsert: true });
+  if (uploadError) throw uploadError;
+
+  const column = CUSTOMER_DOC_COLUMN[kind];
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ [column]: path })
+    .eq("id", customerId);
+  if (updateError) throw updateError;
+
+  return signCustomerDocPath(path);
 }
 
 // ---------------------------------------------------------------------------

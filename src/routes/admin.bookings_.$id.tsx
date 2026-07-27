@@ -8,7 +8,7 @@ import { formatKm, formatMinutes, formatVND, formatRelativeTime } from "@/lib/fo
 import { cn } from "@/lib/utils";
 import { useRequireRole } from "@/lib/auth";
 
-export const Route = createFileRoute("/admin/bookings/$id")({
+export const Route = createFileRoute("/admin/bookings_/$id")({
   head: () => ({ meta: [{ title: "Admin · Chi tiết chuyến đi" }] }),
   component: AdminBookingDetail,
 });

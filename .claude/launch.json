@@ -5,8 +5,9 @@
       "name": "dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
-      "port": 8080,
-      "autoPort": true
+      "port": 80,
+      "autoPort": true,
+      "url": "http://app.localhost"
     }
   ]
 }
