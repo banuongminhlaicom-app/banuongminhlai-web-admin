@@ -1893,13 +1893,14 @@ export interface NotificationRow {
   content: string;
   read: boolean;
   created_at: string;
+  url: string | null;
 }
 
 export async function getNotifications(userId: string, limit = 30): Promise<NotificationRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, title, content, read, created_at")
+    .select("id, title, content, read, created_at, url")
     .eq("owner_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -1997,5 +1998,214 @@ export async function updateSupportTicketStatus(
 ): Promise<void> {
   if (!supabase) throw new Error("Supabase chưa được cấu hình.");
   const { error } = await supabase.from("support_tickets").update({ status }).eq("id", id);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------------------
+// Payout requests / rút tiền tài xế (driver.earnings.tsx, admin.payouts.tsx)
+// Số dư khả dụng tính THẬT từ tổng chuyến đã hoàn thành qua RPC
+// get_driver_payout_summary(); insert chỉ qua RPC request_driver_payout() để
+// tài xế không thể tự chèn yêu cầu vượt số dư qua REST API thẳng.
+// ---------------------------------------------------------------------------
+export type PayoutRequestStatus = "pending" | "paid" | "rejected";
+
+export interface PayoutRequestRow {
+  id: string;
+  driver_id: string;
+  amount: number;
+  status: PayoutRequestStatus;
+  note: string | null;
+  created_at: string;
+  processed_at: string | null;
+}
+
+export interface DriverPayoutSummary {
+  netRevenue: number;
+  requestedTotal: number;
+  available: number;
+}
+
+export async function getDriverPayoutSummary(): Promise<DriverPayoutSummary> {
+  if (!supabase) return { netRevenue: 0, requestedTotal: 0, available: 0 };
+  const { data, error } = await supabase.rpc("get_driver_payout_summary").single();
+  if (error) throw error;
+  const row = data as { net_revenue: number; requested_total: number; available: number };
+  return {
+    netRevenue: row.net_revenue,
+    requestedTotal: row.requested_total,
+    available: row.available,
+  };
+}
+
+export async function requestDriverPayout(amount: number): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase.rpc("request_driver_payout", { p_amount: amount });
+  if (error) throw error;
+}
+
+export async function getDriverPayoutRequests(driverId: string): Promise<PayoutRequestRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("payout_requests")
+    .select("id, driver_id, amount, status, note, created_at, processed_at")
+    .eq("driver_id", driverId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export function subscribePayoutRequests(driverId: string, onChange: () => void): () => void {
+  if (!supabase) return () => {};
+  const client = supabase;
+  const channel = client
+    .channel(`payout-requests-${driverId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "payout_requests",
+        filter: `driver_id=eq.${driverId}`,
+      },
+      onChange,
+    )
+    .subscribe();
+  return () => {
+    client.removeChannel(channel);
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Báo cáo thu nhập tài xế (driver.earnings.tsx) — tổng hợp thật từ trips qua
+// RPC get_driver_earnings_summary() (mốc giờ Việt Nam), thay cho công thức
+// cộng vào số hardcode trước đây.
+// ---------------------------------------------------------------------------
+export interface DriverEarningsSummary {
+  todayGross: number;
+  todayTrips: number;
+  weekGross: number;
+  monthGross: number;
+  monthTrips: number;
+  lifetimeTrips: number;
+  monthFee: number;
+  monthNet: number;
+}
+
+export async function getDriverEarningsSummary(): Promise<DriverEarningsSummary> {
+  if (!supabase) {
+    return {
+      todayGross: 0,
+      todayTrips: 0,
+      weekGross: 0,
+      monthGross: 0,
+      monthTrips: 0,
+      lifetimeTrips: 0,
+      monthFee: 0,
+      monthNet: 0,
+    };
+  }
+  const { data, error } = await supabase.rpc("get_driver_earnings_summary").single();
+  if (error) throw error;
+  const row = data as {
+    today_gross: number;
+    today_trips: number;
+    week_gross: number;
+    month_gross: number;
+    month_trips: number;
+    lifetime_trips: number;
+    month_fee: number;
+    month_net: number;
+  };
+  return {
+    todayGross: row.today_gross,
+    todayTrips: row.today_trips,
+    weekGross: row.week_gross,
+    monthGross: row.month_gross,
+    monthTrips: row.month_trips,
+    lifetimeTrips: row.lifetime_trips,
+    monthFee: row.month_fee,
+    monthNet: row.month_net,
+  };
+}
+
+export interface DriverEarningsTransactionRow {
+  id: string;
+  code: string;
+  price: number;
+  completed_at: string;
+}
+
+export async function getDriverEarningsTransactions(
+  driverId: string,
+  limit = 10,
+): Promise<DriverEarningsTransactionRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("trips")
+    .select("id, code, price, completed_at")
+    .eq("driver_id", driverId)
+    .eq("status", "completed")
+    .order("completed_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).filter((t): t is DriverEarningsTransactionRow => t.completed_at != null);
+}
+
+// ---------------------------------------------------------------------------
+// Push subscriptions (src/lib/push.ts, notifications.tsx) — lưu PushSubscription
+// của trình duyệt để Edge Function send-push đọc và gửi Web Push thật.
+// ---------------------------------------------------------------------------
+export async function savePushSubscription(
+  ownerId: string,
+  endpoint: string,
+  p256dh: string,
+  auth: string,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .upsert({ owner_id: ownerId, endpoint, p256dh, auth }, { onConflict: "endpoint" });
+  if (error) throw error;
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+}
+
+// Admin xem toàn bộ yêu cầu rút tiền — lấy tên tài xế qua bảng profiles riêng,
+// cùng cách getSupportTickets() đã làm ở trên.
+export async function getPayoutRequestsAdmin(): Promise<
+  (PayoutRequestRow & { driver_name: string | null })[]
+> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("payout_requests")
+    .select("id, driver_id, amount, status, note, created_at, processed_at")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const requests = data ?? [];
+
+  const ids = Array.from(new Set(requests.map((r) => r.driver_id)));
+  const namesById = new Map<string, string | null>();
+  if (ids.length) {
+    const { data: nameRows } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", ids);
+    for (const row of nameRows ?? []) namesById.set(row.id, row.full_name);
+  }
+  return requests.map((r) => ({ ...r, driver_name: namesById.get(r.driver_id) ?? null }));
+}
+
+export async function updatePayoutRequestStatus(
+  id: string,
+  status: PayoutRequestStatus,
+): Promise<void> {
+  if (!supabase) throw new Error("Supabase chưa được cấu hình.");
+  const { error } = await supabase
+    .from("payout_requests")
+    .update({ status, processed_at: new Date().toISOString() })
+    .eq("id", id);
   if (error) throw error;
 }

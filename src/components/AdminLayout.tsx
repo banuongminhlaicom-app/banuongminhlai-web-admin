@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
+  Banknote,
   Car,
   DollarSign,
   Gauge,
@@ -22,6 +23,7 @@ const NAV = [
   { to: "/admin/pricing", label: "Bảng giá", Icon: DollarSign },
   { to: "/admin/promotions", label: "Ưu đãi", Icon: Tag },
   { to: "/admin/venues", label: "Địa điểm đối tác", Icon: MapPin },
+  { to: "/admin/payouts", label: "Rút tiền tài xế", Icon: Banknote },
   { to: "/admin/support", label: "Hỗ trợ", Icon: Headphones },
   { to: "/admin/reports", label: "Báo cáo", Icon: LayoutGrid },
 ] as const;

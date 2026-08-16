@@ -211,16 +211,22 @@ const LOGIN_PATH: Record<UserRole, string> = {
 
 // Guard client-side cho các trang cần đăng nhập đúng vai trò — cùng kiểu với
 // useEffect redirect đã có sẵn trong driver.index.tsx trước khi có Supabase.
-export function useRequireRole(role: UserRole): AuthState {
+// Nhận 1 vai trò hoặc mảng vai trò (vd. trang /notifications dùng chung cho
+// cả khách lẫn tài xế) — sai vai trò thì điều hướng về trang login của vai
+// trò đầu tiên trong danh sách.
+export function useRequireRole(role: UserRole | UserRole[]): AuthState {
   const state = useAuthState();
   const navigate = useNavigate();
+  const roles = Array.isArray(role) ? role : [role];
+  const rolesKey = roles.join(",");
 
   useEffect(() => {
     if (state.status === "loading") return;
-    if (state.status === "signed_out" || state.profile?.role !== role) {
-      navigate({ to: LOGIN_PATH[role] });
+    if (state.status === "signed_out" || !state.profile || !roles.includes(state.profile.role)) {
+      navigate({ to: LOGIN_PATH[roles[0]] });
     }
-  }, [state.status, state.profile, role, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status, state.profile, rolesKey, navigate]);
 
   return state;
 }
