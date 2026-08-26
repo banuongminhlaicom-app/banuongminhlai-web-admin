@@ -10,6 +10,7 @@ import {
   getDriverAdminDetail,
   getDriverKyc,
   getTripsByDriver,
+  getWallet,
   uploadDriverDoc,
 } from "@/lib/queries";
 import { TRIP_STATUS_LABEL, type TripStatus } from "@/lib/mock";
@@ -55,6 +56,14 @@ function AdminDriverDetail() {
   const { data: trips = [] } = useQuery({
     queryKey: ["admin", "driver-trips", id],
     queryFn: () => getTripsByDriver(id),
+  });
+  // Khách trả tiền mặt trực tiếp cho tài xế nên tài xế đang nợ nền tảng phí
+  // 40%/chuyến (Giai đoạn 27, ví tự trừ) -- admin cần thấy ngay ở đây để chủ
+  // động liên hệ tài xế nạp thêm trước khi nợ quá cao, tránh phải chặn nhận
+  // chuyến giữa chừng.
+  const { data: wallet } = useQuery({
+    queryKey: ["admin", "driver-wallet", id],
+    queryFn: () => getWallet(id),
   });
   // Ảnh giấy tờ tuỳ thân — riêng tư, chỉ chính chủ + admin xem được (RLS
   // stage18). Dùng để đối chiếu bằng mắt khi chưa có OCR/face-match tự động.
@@ -153,6 +162,11 @@ function AdminDriverDetail() {
             <Stat label="Tổng chuyến" value={String(driver.trips_count)} />
             <Stat label="Chuyến hôm nay" value={String(driver.today_trips)} />
             <Stat label="Doanh thu hôm nay" value={formatVND(driver.today_revenue)} />
+            <Stat
+              label={(wallet?.balance ?? 0) < 0 ? "Đang nợ phí nền tảng" : "Số dư ví"}
+              value={formatVND(wallet?.balance ?? 0)}
+              valueClassName={(wallet?.balance ?? 0) < 0 ? "text-destructive" : "text-success"}
+            />
           </div>
 
           <div className="rounded-3xl bg-surface p-5">
@@ -273,11 +287,19 @@ function AdminDriverDetail() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) {
   return (
     <div className="rounded-3xl bg-surface p-4 text-center">
       <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="mt-1 text-lg font-black">{value}</div>
+      <div className={cn("mt-1 text-lg font-black", valueClassName)}>{value}</div>
     </div>
   );
 }
