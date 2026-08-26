@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Loader2, Lock, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/BrandLogo";
-import { signInAdmin } from "@/lib/auth";
+import { GoogleIcon } from "@/components/GoogleIcon";
+import { signInAdmin, signInWithGoogle, signOutAuth, useAuthState } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({ meta: [{ title: "Đăng nhập quản trị" }] }),
@@ -14,8 +15,24 @@ function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
+  const authState = useAuthState();
+  const rejectedRef = useRef(false);
   const ok = email.trim().length > 3 && password.length >= 6;
+
+  // Xử lý khi quay lại từ Google OAuth — chỉ vào được nếu profile đã có sẵn
+  // role=admin (tài khoản admin luôn được cấp trước, không tự tạo mới ở đây).
+  useEffect(() => {
+    if (authState.status !== "signed_in" || !authState.profile || rejectedRef.current) return;
+    if (authState.profile.role === "admin") {
+      navigate({ to: "/admin" });
+      return;
+    }
+    rejectedRef.current = true;
+    toast.error("Tài khoản này không có quyền admin.");
+    signOutAuth();
+  }, [authState, navigate]);
 
   const submit = async () => {
     if (!ok || loading) return;
@@ -31,6 +48,16 @@ function AdminLogin() {
     }
   };
 
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle("/admin/login");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không đăng nhập được với Google.");
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col bg-background px-6 pb-10 pt-10 safe-top">
       <div className="flex flex-col items-center gap-3">
@@ -42,6 +69,25 @@ function AdminLogin() {
       </div>
 
       <div className="mt-6 space-y-3">
+        <button
+          onClick={handleGoogle}
+          disabled={googleLoading}
+          className="flex w-full items-center justify-center gap-2.5 rounded-2xl bg-surface py-3.5 text-sm font-bold disabled:opacity-60"
+        >
+          {googleLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <GoogleIcon className="h-4 w-4" />
+          )}
+          Đăng nhập với Google
+        </button>
+
+        <div className="flex items-center gap-3 py-1 text-[11px] text-muted-foreground">
+          <div className="h-px flex-1 bg-border" />
+          hoặc dùng email
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
         <label className="block">
           <span className="text-xs font-semibold text-muted-foreground">Email</span>
           <div className="mt-1 flex items-center gap-2 rounded-2xl bg-surface px-4 py-3">
