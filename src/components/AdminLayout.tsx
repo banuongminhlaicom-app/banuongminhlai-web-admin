@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Banknote,
   Car,
@@ -6,14 +6,19 @@ import {
   Gauge,
   Headphones,
   LayoutGrid,
+  LogOut,
   MapPin,
+  Moon,
   Route as RouteIcon,
+  Sun,
   Tag,
   Users,
   Wallet,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { signOutAuth } from "@/lib/auth";
+import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -32,6 +37,14 @@ const NAV = [
 
 export function AdminLayout({ children, title }: { children: ReactNode; title: string }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const { theme, toggle: toggleTheme } = useTheme();
+
+  const logout = async () => {
+    await signOutAuth();
+    navigate({ to: "/admin/login" });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto grid min-h-screen w-full max-w-[1400px] gap-4 p-4 md:grid-cols-[240px_1fr]">
@@ -57,6 +70,12 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
               );
             })}
           </nav>
+          <button
+            onClick={logout}
+            className="mt-auto flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+          >
+            <LogOut className="h-4 w-4" /> Đăng xuất
+          </button>
         </aside>
 
         <main className="min-w-0">
@@ -67,13 +86,27 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
               </div>
               <h1 className="truncate text-xl font-black">{title}</h1>
             </div>
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:block rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">
                 ● Hệ thống ổn định
               </div>
-              <div className="grid h-9 w-9 place-items-center rounded-full gradient-primary font-black text-primary-foreground">
+              <button
+                onClick={toggleTheme}
+                aria-label={theme === "dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối"}
+                className="grid h-9 w-9 place-items-center rounded-full bg-background text-muted-foreground transition hover:text-foreground"
+              >
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+              <div className="hidden sm:grid h-9 w-9 place-items-center rounded-full gradient-primary font-black text-primary-foreground">
                 AD
               </div>
+              <button
+                onClick={logout}
+                aria-label="Đăng xuất"
+                className="grid h-9 w-9 place-items-center rounded-full bg-background text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive md:hidden"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           </header>
 
