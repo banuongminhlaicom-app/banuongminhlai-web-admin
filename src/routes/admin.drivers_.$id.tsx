@@ -1,14 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, ShieldAlert } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ImagePlus, Loader2, ShieldAlert, Trash2 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
-import { approveDriver, getDriverAdminDetail, getDriverKyc, getTripsByDriver } from "@/lib/queries";
+import {
+  approveDriver,
+  deleteDriverDoc,
+  type DriverDocKind,
+  getDriverAdminDetail,
+  getDriverKyc,
+  getTripsByDriver,
+  uploadDriverDoc,
+} from "@/lib/queries";
 import { TRIP_STATUS_LABEL, type TripStatus } from "@/lib/mock";
 import { formatVND, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRequireRole } from "@/lib/auth";
-import { DocUploadRow } from "@/routes/driver.profile";
 
 export const Route = createFileRoute("/admin/drivers_/$id")({
   head: () => ({ meta: [{ title: "Admin · Chi tiết tài xế" }] }),
@@ -289,6 +297,113 @@ function DocThumb({ label, url }: { label: string; url: string | null }) {
         </div>
       )}
       <div className="p-2 text-center text-[11px] font-semibold text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+// Ảnh tài liệu do admin bổ sung (hạnh kiểm/lý lịch tư pháp), upload thẳng lên
+// bucket private "driver-docs" khi chọn file. Port từ DocUploadRow trong
+// route driver.profile.tsx (đã xoá cùng phần app khách hàng/tài xế trên web —
+// mobile app đảm nhiệm phần đó) — chỉ còn admin dùng để bổ sung hồ sơ.
+function DocUploadRow({
+  label,
+  driverId,
+  kind,
+  facing,
+  photoUrl,
+  photoPath,
+  onUploaded,
+}: {
+  label: string;
+  driverId: string;
+  kind: DriverDocKind;
+  facing: "user" | "environment";
+  photoUrl: string | null;
+  photoPath: string | null;
+  onUploaded: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleFile = async (file: File) => {
+    setUploading(true);
+    try {
+      await uploadDriverDoc(driverId, kind, file);
+      toast.success(`Đã tải ${label.toLowerCase()}`);
+      onUploaded();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không tải được ảnh.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!photoPath) return;
+    setDeleting(true);
+    try {
+      await deleteDriverDoc(driverId, kind, photoPath);
+      toast.success(`Đã xoá ${label.toLowerCase()}`);
+      onUploaded();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Không xoá được ảnh.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-2xl bg-surface p-3.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          {photoUrl && <CheckCircle2 className="h-4 w-4 text-success" />}
+          {label}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture={facing}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+            }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || deleting}
+            className="flex items-center gap-1.5 rounded-full bg-background px-3 py-1.5 text-xs font-bold disabled:opacity-60"
+          >
+            {uploading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ImagePlus className="h-3.5 w-3.5" />
+            )}
+            {photoUrl ? "Đổi ảnh" : "Tải ảnh"}
+          </button>
+          {photoUrl && (
+            <button
+              onClick={handleDelete}
+              disabled={uploading || deleting}
+              aria-label={`Xoá ${label.toLowerCase()}`}
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-destructive/15 text-destructive disabled:opacity-60"
+            >
+              {deleting ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+      {photoUrl && (
+        <img src={photoUrl} alt={label} className="mt-3 h-32 w-full rounded-xl object-cover" />
+      )}
     </div>
   );
 }

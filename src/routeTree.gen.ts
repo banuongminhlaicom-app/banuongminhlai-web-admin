@@ -9,32 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WalletRouteImport } from './routes/wallet'
-import { Route as VerifyOtpRouteImport } from './routes/verify-otp'
-import { Route as VehiclesRouteImport } from './routes/vehicles'
-import { Route as TripsRouteImport } from './routes/trips'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SupportRouteImport } from './routes/support'
-import { Route as ScheduleRouteImport } from './routes/schedule'
-import { Route as RewardsRouteImport } from './routes/rewards'
-import { Route as PromotionsRouteImport } from './routes/promotions'
-import { Route as ProfileRouteImport } from './routes/profile'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as NotificationsRouteImport } from './routes/notifications'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as HomeRouteImport } from './routes/home'
-import { Route as ChangePasswordRouteImport } from './routes/change-password'
-import { Route as BookingRouteImport } from './routes/booking'
-import { Route as AddressesRouteImport } from './routes/addresses'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DriverIndexRouteImport } from './routes/driver.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as DriverProfileRouteImport } from './routes/driver.profile'
-import { Route as DriverLoginRouteImport } from './routes/driver.login'
-import { Route as DriverEarningsRouteImport } from './routes/driver.earnings'
-import { Route as BookingSearchingRouteImport } from './routes/booking_.searching'
-import { Route as BookingIdRouteImport } from './routes/booking_.$id'
 import { Route as AdminVenuesRouteImport } from './routes/admin.venues'
 import { Route as AdminSupportRouteImport } from './routes/admin.support'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
@@ -46,140 +22,18 @@ import { Route as AdminDriversRouteImport } from './routes/admin.drivers'
 import { Route as AdminDriverWalletsRouteImport } from './routes/admin.driver-wallets'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
-import { Route as DriverTripsIndexRouteImport } from './routes/driver.trips.index'
-import { Route as DriverTripsIdRouteImport } from './routes/driver.trips.$id'
 import { Route as AdminDriversIdRouteImport } from './routes/admin.drivers_.$id'
 import { Route as AdminCustomersIdRouteImport } from './routes/admin.customers_.$id'
 import { Route as AdminBookingsIdRouteImport } from './routes/admin.bookings_.$id'
 
-const WalletRoute = WalletRouteImport.update({
-  id: '/wallet',
-  path: '/wallet',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VerifyOtpRoute = VerifyOtpRouteImport.update({
-  id: '/verify-otp',
-  path: '/verify-otp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const VehiclesRoute = VehiclesRouteImport.update({
-  id: '/vehicles',
-  path: '/vehicles',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TripsRoute = TripsRouteImport.update({
-  id: '/trips',
-  path: '/trips',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SupportRoute = SupportRouteImport.update({
-  id: '/support',
-  path: '/support',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ScheduleRoute = ScheduleRouteImport.update({
-  id: '/schedule',
-  path: '/schedule',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RewardsRoute = RewardsRouteImport.update({
-  id: '/rewards',
-  path: '/rewards',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PromotionsRoute = PromotionsRouteImport.update({
-  id: '/promotions',
-  path: '/promotions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProfileRoute = ProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingRoute = OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotificationsRoute = NotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HomeRoute = HomeRouteImport.update({
-  id: '/home',
-  path: '/home',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChangePasswordRoute = ChangePasswordRouteImport.update({
-  id: '/change-password',
-  path: '/change-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BookingRoute = BookingRouteImport.update({
-  id: '/booking',
-  path: '/booking',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AddressesRoute = AddressesRouteImport.update({
-  id: '/addresses',
-  path: '/addresses',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DriverIndexRoute = DriverIndexRouteImport.update({
-  id: '/driver/',
-  path: '/driver/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DriverProfileRoute = DriverProfileRouteImport.update({
-  id: '/driver/profile',
-  path: '/driver/profile',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DriverLoginRoute = DriverLoginRouteImport.update({
-  id: '/driver/login',
-  path: '/driver/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DriverEarningsRoute = DriverEarningsRouteImport.update({
-  id: '/driver/earnings',
-  path: '/driver/earnings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BookingSearchingRoute = BookingSearchingRouteImport.update({
-  id: '/booking_/searching',
-  path: '/booking/searching',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BookingIdRoute = BookingIdRouteImport.update({
-  id: '/booking_/$id',
-  path: '/booking/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminVenuesRoute = AdminVenuesRouteImport.update({
@@ -237,16 +91,6 @@ const AdminBookingsRoute = AdminBookingsRouteImport.update({
   path: '/admin/bookings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DriverTripsIndexRoute = DriverTripsIndexRouteImport.update({
-  id: '/driver/trips/',
-  path: '/driver/trips/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DriverTripsIdRoute = DriverTripsIdRouteImport.update({
-  id: '/driver/trips/$id',
-  path: '/driver/trips/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminDriversIdRoute = AdminDriversIdRouteImport.update({
   id: '/admin/drivers_/$id',
   path: '/admin/drivers/$id',
@@ -265,24 +109,6 @@ const AdminBookingsIdRoute = AdminBookingsIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/addresses': typeof AddressesRoute
-  '/booking': typeof BookingRoute
-  '/change-password': typeof ChangePasswordRoute
-  '/home': typeof HomeRoute
-  '/login': typeof LoginRoute
-  '/notifications': typeof NotificationsRoute
-  '/onboarding': typeof OnboardingRoute
-  '/privacy': typeof PrivacyRoute
-  '/profile': typeof ProfileRoute
-  '/promotions': typeof PromotionsRoute
-  '/rewards': typeof RewardsRoute
-  '/schedule': typeof ScheduleRoute
-  '/support': typeof SupportRoute
-  '/terms': typeof TermsRoute
-  '/trips': typeof TripsRoute
-  '/vehicles': typeof VehiclesRoute
-  '/verify-otp': typeof VerifyOtpRoute
-  '/wallet': typeof WalletRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/driver-wallets': typeof AdminDriverWalletsRoute
@@ -294,39 +120,13 @@ export interface FileRoutesByFullPath {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/venues': typeof AdminVenuesRoute
-  '/booking/$id': typeof BookingIdRoute
-  '/booking/searching': typeof BookingSearchingRoute
-  '/driver/earnings': typeof DriverEarningsRoute
-  '/driver/login': typeof DriverLoginRoute
-  '/driver/profile': typeof DriverProfileRoute
   '/admin/': typeof AdminIndexRoute
-  '/driver/': typeof DriverIndexRoute
   '/admin/bookings/$id': typeof AdminBookingsIdRoute
   '/admin/customers/$id': typeof AdminCustomersIdRoute
   '/admin/drivers/$id': typeof AdminDriversIdRoute
-  '/driver/trips/$id': typeof DriverTripsIdRoute
-  '/driver/trips/': typeof DriverTripsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/addresses': typeof AddressesRoute
-  '/booking': typeof BookingRoute
-  '/change-password': typeof ChangePasswordRoute
-  '/home': typeof HomeRoute
-  '/login': typeof LoginRoute
-  '/notifications': typeof NotificationsRoute
-  '/onboarding': typeof OnboardingRoute
-  '/privacy': typeof PrivacyRoute
-  '/profile': typeof ProfileRoute
-  '/promotions': typeof PromotionsRoute
-  '/rewards': typeof RewardsRoute
-  '/schedule': typeof ScheduleRoute
-  '/support': typeof SupportRoute
-  '/terms': typeof TermsRoute
-  '/trips': typeof TripsRoute
-  '/vehicles': typeof VehiclesRoute
-  '/verify-otp': typeof VerifyOtpRoute
-  '/wallet': typeof WalletRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/driver-wallets': typeof AdminDriverWalletsRoute
@@ -338,40 +138,14 @@ export interface FileRoutesByTo {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/venues': typeof AdminVenuesRoute
-  '/booking/$id': typeof BookingIdRoute
-  '/booking/searching': typeof BookingSearchingRoute
-  '/driver/earnings': typeof DriverEarningsRoute
-  '/driver/login': typeof DriverLoginRoute
-  '/driver/profile': typeof DriverProfileRoute
   '/admin': typeof AdminIndexRoute
-  '/driver': typeof DriverIndexRoute
   '/admin/bookings/$id': typeof AdminBookingsIdRoute
   '/admin/customers/$id': typeof AdminCustomersIdRoute
   '/admin/drivers/$id': typeof AdminDriversIdRoute
-  '/driver/trips/$id': typeof DriverTripsIdRoute
-  '/driver/trips': typeof DriverTripsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/addresses': typeof AddressesRoute
-  '/booking': typeof BookingRoute
-  '/change-password': typeof ChangePasswordRoute
-  '/home': typeof HomeRoute
-  '/login': typeof LoginRoute
-  '/notifications': typeof NotificationsRoute
-  '/onboarding': typeof OnboardingRoute
-  '/privacy': typeof PrivacyRoute
-  '/profile': typeof ProfileRoute
-  '/promotions': typeof PromotionsRoute
-  '/rewards': typeof RewardsRoute
-  '/schedule': typeof ScheduleRoute
-  '/support': typeof SupportRoute
-  '/terms': typeof TermsRoute
-  '/trips': typeof TripsRoute
-  '/vehicles': typeof VehiclesRoute
-  '/verify-otp': typeof VerifyOtpRoute
-  '/wallet': typeof WalletRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
   '/admin/driver-wallets': typeof AdminDriverWalletsRoute
@@ -383,41 +157,15 @@ export interface FileRoutesById {
   '/admin/reports': typeof AdminReportsRoute
   '/admin/support': typeof AdminSupportRoute
   '/admin/venues': typeof AdminVenuesRoute
-  '/booking_/$id': typeof BookingIdRoute
-  '/booking_/searching': typeof BookingSearchingRoute
-  '/driver/earnings': typeof DriverEarningsRoute
-  '/driver/login': typeof DriverLoginRoute
-  '/driver/profile': typeof DriverProfileRoute
   '/admin/': typeof AdminIndexRoute
-  '/driver/': typeof DriverIndexRoute
   '/admin/bookings_/$id': typeof AdminBookingsIdRoute
   '/admin/customers_/$id': typeof AdminCustomersIdRoute
   '/admin/drivers_/$id': typeof AdminDriversIdRoute
-  '/driver/trips/$id': typeof DriverTripsIdRoute
-  '/driver/trips/': typeof DriverTripsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/addresses'
-    | '/booking'
-    | '/change-password'
-    | '/home'
-    | '/login'
-    | '/notifications'
-    | '/onboarding'
-    | '/privacy'
-    | '/profile'
-    | '/promotions'
-    | '/rewards'
-    | '/schedule'
-    | '/support'
-    | '/terms'
-    | '/trips'
-    | '/vehicles'
-    | '/verify-otp'
-    | '/wallet'
     | '/admin/bookings'
     | '/admin/customers'
     | '/admin/driver-wallets'
@@ -429,39 +177,13 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/support'
     | '/admin/venues'
-    | '/booking/$id'
-    | '/booking/searching'
-    | '/driver/earnings'
-    | '/driver/login'
-    | '/driver/profile'
     | '/admin/'
-    | '/driver/'
     | '/admin/bookings/$id'
     | '/admin/customers/$id'
     | '/admin/drivers/$id'
-    | '/driver/trips/$id'
-    | '/driver/trips/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/addresses'
-    | '/booking'
-    | '/change-password'
-    | '/home'
-    | '/login'
-    | '/notifications'
-    | '/onboarding'
-    | '/privacy'
-    | '/profile'
-    | '/promotions'
-    | '/rewards'
-    | '/schedule'
-    | '/support'
-    | '/terms'
-    | '/trips'
-    | '/vehicles'
-    | '/verify-otp'
-    | '/wallet'
     | '/admin/bookings'
     | '/admin/customers'
     | '/admin/driver-wallets'
@@ -473,39 +195,13 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/support'
     | '/admin/venues'
-    | '/booking/$id'
-    | '/booking/searching'
-    | '/driver/earnings'
-    | '/driver/login'
-    | '/driver/profile'
     | '/admin'
-    | '/driver'
     | '/admin/bookings/$id'
     | '/admin/customers/$id'
     | '/admin/drivers/$id'
-    | '/driver/trips/$id'
-    | '/driver/trips'
   id:
     | '__root__'
     | '/'
-    | '/addresses'
-    | '/booking'
-    | '/change-password'
-    | '/home'
-    | '/login'
-    | '/notifications'
-    | '/onboarding'
-    | '/privacy'
-    | '/profile'
-    | '/promotions'
-    | '/rewards'
-    | '/schedule'
-    | '/support'
-    | '/terms'
-    | '/trips'
-    | '/vehicles'
-    | '/verify-otp'
-    | '/wallet'
     | '/admin/bookings'
     | '/admin/customers'
     | '/admin/driver-wallets'
@@ -517,40 +213,14 @@ export interface FileRouteTypes {
     | '/admin/reports'
     | '/admin/support'
     | '/admin/venues'
-    | '/booking_/$id'
-    | '/booking_/searching'
-    | '/driver/earnings'
-    | '/driver/login'
-    | '/driver/profile'
     | '/admin/'
-    | '/driver/'
     | '/admin/bookings_/$id'
     | '/admin/customers_/$id'
     | '/admin/drivers_/$id'
-    | '/driver/trips/$id'
-    | '/driver/trips/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AddressesRoute: typeof AddressesRoute
-  BookingRoute: typeof BookingRoute
-  ChangePasswordRoute: typeof ChangePasswordRoute
-  HomeRoute: typeof HomeRoute
-  LoginRoute: typeof LoginRoute
-  NotificationsRoute: typeof NotificationsRoute
-  OnboardingRoute: typeof OnboardingRoute
-  PrivacyRoute: typeof PrivacyRoute
-  ProfileRoute: typeof ProfileRoute
-  PromotionsRoute: typeof PromotionsRoute
-  RewardsRoute: typeof RewardsRoute
-  ScheduleRoute: typeof ScheduleRoute
-  SupportRoute: typeof SupportRoute
-  TermsRoute: typeof TermsRoute
-  TripsRoute: typeof TripsRoute
-  VehiclesRoute: typeof VehiclesRoute
-  VerifyOtpRoute: typeof VerifyOtpRoute
-  WalletRoute: typeof WalletRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCustomersRoute: typeof AdminCustomersRoute
   AdminDriverWalletsRoute: typeof AdminDriverWalletsRoute
@@ -562,148 +232,14 @@ export interface RootRouteChildren {
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSupportRoute: typeof AdminSupportRoute
   AdminVenuesRoute: typeof AdminVenuesRoute
-  BookingIdRoute: typeof BookingIdRoute
-  BookingSearchingRoute: typeof BookingSearchingRoute
-  DriverEarningsRoute: typeof DriverEarningsRoute
-  DriverLoginRoute: typeof DriverLoginRoute
-  DriverProfileRoute: typeof DriverProfileRoute
   AdminIndexRoute: typeof AdminIndexRoute
-  DriverIndexRoute: typeof DriverIndexRoute
   AdminBookingsIdRoute: typeof AdminBookingsIdRoute
   AdminCustomersIdRoute: typeof AdminCustomersIdRoute
   AdminDriversIdRoute: typeof AdminDriversIdRoute
-  DriverTripsIdRoute: typeof DriverTripsIdRoute
-  DriverTripsIndexRoute: typeof DriverTripsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/wallet': {
-      id: '/wallet'
-      path: '/wallet'
-      fullPath: '/wallet'
-      preLoaderRoute: typeof WalletRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/verify-otp': {
-      id: '/verify-otp'
-      path: '/verify-otp'
-      fullPath: '/verify-otp'
-      preLoaderRoute: typeof VerifyOtpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/vehicles': {
-      id: '/vehicles'
-      path: '/vehicles'
-      fullPath: '/vehicles'
-      preLoaderRoute: typeof VehiclesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/trips': {
-      id: '/trips'
-      path: '/trips'
-      fullPath: '/trips'
-      preLoaderRoute: typeof TripsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/support': {
-      id: '/support'
-      path: '/support'
-      fullPath: '/support'
-      preLoaderRoute: typeof SupportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/schedule': {
-      id: '/schedule'
-      path: '/schedule'
-      fullPath: '/schedule'
-      preLoaderRoute: typeof ScheduleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/rewards': {
-      id: '/rewards'
-      path: '/rewards'
-      fullPath: '/rewards'
-      preLoaderRoute: typeof RewardsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/promotions': {
-      id: '/promotions'
-      path: '/promotions'
-      fullPath: '/promotions'
-      preLoaderRoute: typeof PromotionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/profile': {
-      id: '/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof ProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notifications': {
-      id: '/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof NotificationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/home': {
-      id: '/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof HomeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/change-password': {
-      id: '/change-password'
-      path: '/change-password'
-      fullPath: '/change-password'
-      preLoaderRoute: typeof ChangePasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/booking': {
-      id: '/booking'
-      path: '/booking'
-      fullPath: '/booking'
-      preLoaderRoute: typeof BookingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/addresses': {
-      id: '/addresses'
-      path: '/addresses'
-      fullPath: '/addresses'
-      preLoaderRoute: typeof AddressesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -711,53 +247,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/driver/': {
-      id: '/driver/'
-      path: '/driver'
-      fullPath: '/driver/'
-      preLoaderRoute: typeof DriverIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/': {
       id: '/admin/'
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/driver/profile': {
-      id: '/driver/profile'
-      path: '/driver/profile'
-      fullPath: '/driver/profile'
-      preLoaderRoute: typeof DriverProfileRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/driver/login': {
-      id: '/driver/login'
-      path: '/driver/login'
-      fullPath: '/driver/login'
-      preLoaderRoute: typeof DriverLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/driver/earnings': {
-      id: '/driver/earnings'
-      path: '/driver/earnings'
-      fullPath: '/driver/earnings'
-      preLoaderRoute: typeof DriverEarningsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/booking_/searching': {
-      id: '/booking_/searching'
-      path: '/booking/searching'
-      fullPath: '/booking/searching'
-      preLoaderRoute: typeof BookingSearchingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/booking_/$id': {
-      id: '/booking_/$id'
-      path: '/booking/$id'
-      fullPath: '/booking/$id'
-      preLoaderRoute: typeof BookingIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/venues': {
@@ -837,20 +331,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBookingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/driver/trips/': {
-      id: '/driver/trips/'
-      path: '/driver/trips'
-      fullPath: '/driver/trips/'
-      preLoaderRoute: typeof DriverTripsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/driver/trips/$id': {
-      id: '/driver/trips/$id'
-      path: '/driver/trips/$id'
-      fullPath: '/driver/trips/$id'
-      preLoaderRoute: typeof DriverTripsIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/drivers_/$id': {
       id: '/admin/drivers_/$id'
       path: '/admin/drivers/$id'
@@ -877,24 +357,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AddressesRoute: AddressesRoute,
-  BookingRoute: BookingRoute,
-  ChangePasswordRoute: ChangePasswordRoute,
-  HomeRoute: HomeRoute,
-  LoginRoute: LoginRoute,
-  NotificationsRoute: NotificationsRoute,
-  OnboardingRoute: OnboardingRoute,
-  PrivacyRoute: PrivacyRoute,
-  ProfileRoute: ProfileRoute,
-  PromotionsRoute: PromotionsRoute,
-  RewardsRoute: RewardsRoute,
-  ScheduleRoute: ScheduleRoute,
-  SupportRoute: SupportRoute,
-  TermsRoute: TermsRoute,
-  TripsRoute: TripsRoute,
-  VehiclesRoute: VehiclesRoute,
-  VerifyOtpRoute: VerifyOtpRoute,
-  WalletRoute: WalletRoute,
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCustomersRoute: AdminCustomersRoute,
   AdminDriverWalletsRoute: AdminDriverWalletsRoute,
@@ -906,18 +368,10 @@ const rootRouteChildren: RootRouteChildren = {
   AdminReportsRoute: AdminReportsRoute,
   AdminSupportRoute: AdminSupportRoute,
   AdminVenuesRoute: AdminVenuesRoute,
-  BookingIdRoute: BookingIdRoute,
-  BookingSearchingRoute: BookingSearchingRoute,
-  DriverEarningsRoute: DriverEarningsRoute,
-  DriverLoginRoute: DriverLoginRoute,
-  DriverProfileRoute: DriverProfileRoute,
   AdminIndexRoute: AdminIndexRoute,
-  DriverIndexRoute: DriverIndexRoute,
   AdminBookingsIdRoute: AdminBookingsIdRoute,
   AdminCustomersIdRoute: AdminCustomersIdRoute,
   AdminDriversIdRoute: AdminDriversIdRoute,
-  DriverTripsIdRoute: DriverTripsIdRoute,
-  DriverTripsIndexRoute: DriverTripsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

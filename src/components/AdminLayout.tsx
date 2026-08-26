@@ -57,11 +57,6 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
               );
             })}
           </nav>
-          <div className="mt-auto pt-4 text-[10px] text-muted-foreground">
-            <Link to="/home" className="hover:text-foreground">
-              ← Về khu khách hàng
-            </Link>
-          </div>
         </aside>
 
         <main className="min-w-0">
