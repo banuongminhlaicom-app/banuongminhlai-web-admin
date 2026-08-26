@@ -43,6 +43,7 @@ import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
 import { Route as AdminPayoutsRouteImport } from './routes/admin.payouts'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminDriversRouteImport } from './routes/admin.drivers'
+import { Route as AdminDriverWalletsRouteImport } from './routes/admin.driver-wallets'
 import { Route as AdminCustomersRouteImport } from './routes/admin.customers'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
 import { Route as DriverTripsIndexRouteImport } from './routes/driver.trips.index'
@@ -221,6 +222,11 @@ const AdminDriversRoute = AdminDriversRouteImport.update({
   path: '/admin/drivers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDriverWalletsRoute = AdminDriverWalletsRouteImport.update({
+  id: '/admin/driver-wallets',
+  path: '/admin/driver-wallets',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCustomersRoute = AdminCustomersRouteImport.update({
   id: '/admin/customers',
   path: '/admin/customers',
@@ -279,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/wallet': typeof WalletRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
+  '/admin/driver-wallets': typeof AdminDriverWalletsRoute
   '/admin/drivers': typeof AdminDriversRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/payouts': typeof AdminPayoutsRoute
@@ -322,6 +329,7 @@ export interface FileRoutesByTo {
   '/wallet': typeof WalletRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
+  '/admin/driver-wallets': typeof AdminDriverWalletsRoute
   '/admin/drivers': typeof AdminDriversRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/payouts': typeof AdminPayoutsRoute
@@ -366,6 +374,7 @@ export interface FileRoutesById {
   '/wallet': typeof WalletRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/customers': typeof AdminCustomersRoute
+  '/admin/driver-wallets': typeof AdminDriverWalletsRoute
   '/admin/drivers': typeof AdminDriversRoute
   '/admin/login': typeof AdminLoginRoute
   '/admin/payouts': typeof AdminPayoutsRoute
@@ -411,6 +420,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/admin/bookings'
     | '/admin/customers'
+    | '/admin/driver-wallets'
     | '/admin/drivers'
     | '/admin/login'
     | '/admin/payouts'
@@ -454,6 +464,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/admin/bookings'
     | '/admin/customers'
+    | '/admin/driver-wallets'
     | '/admin/drivers'
     | '/admin/login'
     | '/admin/payouts'
@@ -497,6 +508,7 @@ export interface FileRouteTypes {
     | '/wallet'
     | '/admin/bookings'
     | '/admin/customers'
+    | '/admin/driver-wallets'
     | '/admin/drivers'
     | '/admin/login'
     | '/admin/payouts'
@@ -541,6 +553,7 @@ export interface RootRouteChildren {
   WalletRoute: typeof WalletRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCustomersRoute: typeof AdminCustomersRoute
+  AdminDriverWalletsRoute: typeof AdminDriverWalletsRoute
   AdminDriversRoute: typeof AdminDriversRoute
   AdminLoginRoute: typeof AdminLoginRoute
   AdminPayoutsRoute: typeof AdminPayoutsRoute
@@ -803,6 +816,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDriversRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/driver-wallets': {
+      id: '/admin/driver-wallets'
+      path: '/admin/driver-wallets'
+      fullPath: '/admin/driver-wallets'
+      preLoaderRoute: typeof AdminDriverWalletsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/customers': {
       id: '/admin/customers'
       path: '/admin/customers'
@@ -877,6 +897,7 @@ const rootRouteChildren: RootRouteChildren = {
   WalletRoute: WalletRoute,
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCustomersRoute: AdminCustomersRoute,
+  AdminDriverWalletsRoute: AdminDriverWalletsRoute,
   AdminDriversRoute: AdminDriversRoute,
   AdminLoginRoute: AdminLoginRoute,
   AdminPayoutsRoute: AdminPayoutsRoute,

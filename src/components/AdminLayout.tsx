@@ -10,6 +10,7 @@ import {
   Route as RouteIcon,
   Tag,
   Users,
+  Wallet,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -24,6 +25,7 @@ const NAV = [
   { to: "/admin/promotions", label: "Ưu đãi", Icon: Tag },
   { to: "/admin/venues", label: "Địa điểm đối tác", Icon: MapPin },
   { to: "/admin/payouts", label: "Rút tiền tài xế", Icon: Banknote },
+  { to: "/admin/driver-wallets", label: "Ví tài xế", Icon: Wallet },
   { to: "/admin/support", label: "Hỗ trợ", Icon: Headphones },
   { to: "/admin/reports", label: "Báo cáo", Icon: LayoutGrid },
 ] as const;

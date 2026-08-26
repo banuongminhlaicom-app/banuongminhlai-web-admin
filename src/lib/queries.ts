@@ -2209,3 +2209,70 @@ export async function updatePayoutRequestStatus(
     .eq("id", id);
   if (error) throw error;
 }
+
+// Admin xem ví/nợ phí nền tảng của tài xế (mobile Giai đoạn 27: 40%/chuyến
+// tiền mặt trừ vào ví, âm = tài xế đang nợ). RLS wallets_select_admin/
+// wallet_tx_select_admin (Giai đoạn 28) cho phép admin đọc ví của mọi tài xế.
+export interface DriverWalletRow {
+  owner_id: string;
+  balance: number;
+  updated_at: string;
+  driver_name: string | null;
+}
+
+export async function getDriverWalletsAdmin(): Promise<DriverWalletRow[]> {
+  if (!supabase) return [];
+  const { data: driverRows, error: driverErr } = await supabase.from("drivers").select("id");
+  if (driverErr) throw driverErr;
+  const driverIds = (driverRows ?? []).map((d) => d.id);
+  if (!driverIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("wallets")
+    .select("owner_id, balance, updated_at")
+    .in("owner_id", driverIds)
+    .order("balance", { ascending: true });
+  if (error) throw error;
+  const wallets = data ?? [];
+
+  const namesById = new Map<string, string | null>();
+  const { data: nameRows } = await supabase.from("profiles").select("id, full_name").in("id", driverIds);
+  for (const row of nameRows ?? []) namesById.set(row.id, row.full_name);
+
+  return wallets.map((w) => ({ ...w, driver_name: namesById.get(w.owner_id) ?? null }));
+}
+
+export interface DriverWalletTransactionRow {
+  id: string;
+  owner_id: string;
+  type: "topup" | "trip_payment" | "refund" | "adjustment";
+  amount: number;
+  description: string | null;
+  created_at: string;
+  driver_name: string | null;
+}
+
+export async function getDriverWalletTransactionsAdmin(
+  limit = 50,
+): Promise<DriverWalletTransactionRow[]> {
+  if (!supabase) return [];
+  const { data: driverRows, error: driverErr } = await supabase.from("drivers").select("id");
+  if (driverErr) throw driverErr;
+  const driverIds = (driverRows ?? []).map((d) => d.id);
+  if (!driverIds.length) return [];
+
+  const { data, error } = await supabase
+    .from("wallet_transactions")
+    .select("id, owner_id, type, amount, description, created_at")
+    .in("owner_id", driverIds)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  const txs = data ?? [];
+
+  const namesById = new Map<string, string | null>();
+  const { data: nameRows } = await supabase.from("profiles").select("id, full_name").in("id", driverIds);
+  for (const row of nameRows ?? []) namesById.set(row.id, row.full_name);
+
+  return txs.map((t) => ({ ...t, driver_name: namesById.get(t.owner_id) ?? null }));
+}
