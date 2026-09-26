@@ -27,6 +27,16 @@ let state: AuthState = DEFAULT_STATE;
 let initialized = false;
 const listeners = new Set<() => void>();
 
+// Chặn listener onAuthStateChange tự chạy refreshFromSession() SONG SONG với
+// 1 luồng đăng nhập thủ công (signInAdmin/verifyPhoneOtp) đang tự tải
+// profile + setState của chính nó — 2 lần loadProfile() độc lập cho CÙNG 1
+// sự kiện đăng nhập có thể trả về khác nhau do thời điểm request (token của
+// client REST đôi khi chưa kịp cập nhật ngay khi sự kiện bắn ra), lần nào
+// xong sau sẽ ghi đè lần trước. Từng gây lỗi: đăng nhập admin thành công,
+// dashboard hiện ra 1 chớp rồi tự bị đá về lại trang login vì listener kia
+// lỡ trả về profile null rồi ghi đè state đúng vừa thiết lập.
+let manualAuthInFlight = false;
+
 function emit() {
   listeners.forEach((l) => l());
 }
@@ -70,6 +80,7 @@ function ensureInitialized() {
 
   supabase.auth.getSession().then(({ data }) => refreshFromSession(data.session));
   supabase.auth.onAuthStateChange((_event, session) => {
+    if (manualAuthInFlight) return;
     refreshFromSession(session);
   });
 }
@@ -165,14 +176,19 @@ export async function verifyPhoneOtp(
       "Supabase chưa được cấu hình (.env thiếu VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).",
     );
   }
-  const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
-  if (error) throw error;
-  const session = data.session;
-  if (!session) throw new Error("Không lấy được phiên đăng nhập sau khi xác thực OTP.");
+  manualAuthInFlight = true;
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
+    if (error) throw error;
+    const session = data.session;
+    if (!session) throw new Error("Không lấy được phiên đăng nhập sau khi xác thực OTP.");
 
-  await ensureProfile(session.user.id, role, phone);
-  await refreshFromSession(session);
-  return session;
+    await ensureProfile(session.user.id, role, phone);
+    await refreshFromSession(session);
+    return session;
+  } finally {
+    manualAuthInFlight = false;
+  }
 }
 
 export async function signInAdmin(email: string, password: string): Promise<Session> {
@@ -181,20 +197,25 @@ export async function signInAdmin(email: string, password: string): Promise<Sess
       "Supabase chưa được cấu hình (.env thiếu VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY).",
     );
   }
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  const session = data.session;
-  if (!session) throw new Error("Không lấy được phiên đăng nhập.");
+  manualAuthInFlight = true;
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    const session = data.session;
+    if (!session) throw new Error("Không lấy được phiên đăng nhập.");
 
-  const profile = await loadProfile(session.user.id);
-  if (!profile || profile.role !== "admin") {
-    await supabase.auth.signOut();
-    setState({ status: "signed_out", session: null, profile: null });
-    throw new Error("Tài khoản này không có quyền admin.");
+    const profile = await loadProfile(session.user.id);
+    if (!profile || profile.role !== "admin") {
+      await supabase.auth.signOut();
+      setState({ status: "signed_out", session: null, profile: null });
+      throw new Error("Tài khoản này không có quyền admin.");
+    }
+
+    setState({ status: "signed_in", session, profile });
+    return session;
+  } finally {
+    manualAuthInFlight = false;
   }
-
-  setState({ status: "signed_in", session, profile });
-  return session;
 }
 
 export async function signOutAuth() {
