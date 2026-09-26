@@ -9,6 +9,7 @@ import {
   LogOut,
   MapPin,
   Moon,
+  Radio,
   Route as RouteIcon,
   Sun,
   Tag,
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/admin", label: "Tổng quan", Icon: Gauge },
+  { to: "/admin/live", label: "Bản đồ trực tiếp", Icon: Radio },
   { to: "/admin/bookings", label: "Chuyến đi", Icon: RouteIcon },
   { to: "/admin/drivers", label: "Tài xế", Icon: Car },
   { to: "/admin/customers", label: "Khách hàng", Icon: Users },

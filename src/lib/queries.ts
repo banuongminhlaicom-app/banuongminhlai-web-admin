@@ -403,6 +403,91 @@ export async function approveDriver(driverId: string, approved: boolean) {
   if (error) throw error;
 }
 
+// ---------------------------------------------------------------------------
+// Bản đồ trực tiếp (admin.live.tsx) — tài xế đang online (GPS thật, cập nhật
+// qua drivers.current_lat/lng — realtime đã bật từ Giai đoạn 4) + chuyến đang
+// diễn ra (điểm đón/đến tĩnh, khách không gửi GPS nên không có vị trí sống
+// động cho khách — chỉ tài xế mới có).
+// ---------------------------------------------------------------------------
+export interface LiveDriverRow {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  status: string;
+  current_lat: number | null;
+  current_lng: number | null;
+  rating: number;
+  today_trips: number;
+}
+
+export async function getOnlineDrivers(): Promise<LiveDriverRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, full_name, phone, drivers!inner(status, current_lat, current_lng, rating, today_trips, online)",
+    )
+    .eq("role", "driver")
+    .eq("drivers.online", true);
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const d = Array.isArray(row.drivers) ? row.drivers[0] : row.drivers;
+    return {
+      id: row.id,
+      full_name: row.full_name,
+      phone: row.phone,
+      status: d?.status ?? "online",
+      current_lat: d?.current_lat ?? null,
+      current_lng: d?.current_lng ?? null,
+      rating: d?.rating ?? 5,
+      today_trips: d?.today_trips ?? 0,
+    };
+  });
+}
+
+export interface LiveTripRow {
+  id: string;
+  code: string;
+  status: string;
+  pickup_address: string;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
+  dropoff_address: string;
+  dropoff_lat: number | null;
+  dropoff_lng: number | null;
+  customer_id: string;
+  driver_id: string | null;
+  customer_name: string | null;
+  driver_name: string | null;
+}
+
+export async function getActiveTrips(): Promise<LiveTripRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("trips")
+    .select(
+      "id, code, status, pickup_address, pickup_lat, pickup_lng, dropoff_address, dropoff_lat, dropoff_lng, customer_id, driver_id",
+    )
+    .in("status", ACTIVE_TRIP_STATUSES);
+  if (error) throw error;
+  const trips = data ?? [];
+
+  const ids = Array.from(
+    new Set(trips.flatMap((t) => [t.customer_id, t.driver_id]).filter((id): id is string => !!id)),
+  );
+  const namesById = new Map<string, string | null>();
+  if (ids.length) {
+    const { data: nameRows } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+    for (const row of nameRows ?? []) namesById.set(row.id, row.full_name);
+  }
+
+  return trips.map((t) => ({
+    ...t,
+    customer_name: namesById.get(t.customer_id) ?? null,
+    driver_name: t.driver_id ? (namesById.get(t.driver_id) ?? null) : null,
+  }));
+}
+
 // Hồ sơ đầy đủ hơn DriverRow (list) — dùng cho màn admin.drivers.$id.tsx.
 export interface DriverAdminDetail extends DriverRow {
   status: string;
