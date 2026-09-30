@@ -117,11 +117,22 @@ Deno.serve(async (req) => {
   // Expo Push API nhận 1 mảng message trong 1 request (tối đa 100 phần tử/lần
   // — số thiết bị của 1 người dùng luôn nhỏ hơn nhiều nên không cần chia lô).
   if (mobileRows.length > 0) {
+    // channelId "trips" = kênh Android mức HIGH do app mobile tạo sẵn
+    // (lib/notifications.ts, TRIPS_CHANNEL_ID) → bật banner đầu màn hình + chuông
+    // kể cả khi app đang tắt. Thiếu channelId/priority thì Android chỉ đẩy im
+    // lặng vào thanh thông báo, tài xế không thấy có chuyến mới.
+    // "Bạn có chuyến mới!" (trigger trips_notify_driver, stage24) → kênh
+    // "new_trip_ring" có âm thanh riêng lặp ~16s (app mobile tạo sẵn, xem
+    // NEW_TRIP_CHANNEL_ID). Đổi tiêu đề ở trigger thì phải đổi cả dòng này.
+    const channelId = record.title === "Bạn có chuyến mới!" ? "new_trip_ring" : "trips";
     const messages = mobileRows.map((sub) => ({
       to: sub.endpoint,
       title: record.title,
       body: record.content,
       data: { url: record.url ?? "/notifications" },
+      channelId,
+      priority: "high",
+      sound: "default",
     }));
 
     try {
